@@ -1,0 +1,150 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "Open LLM VTuber",
+  "projectDescription": "A cross-platform, fully offline-capable voice-interactive AI companion with a Live2D avatar, supporting modular LLM, ASR, and TTS backends.",
+  "theme": "almond",
+  "primaryColor": "#9c5c6c",
+  "lightColor": "#3f3a6c",
+  "darkColor": "#c6b3ca",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Getting Started",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": ["introduction", "quick-start"]
+          },
+          {
+            "group": "Installation",
+            "pages": [
+              "installation/windows",
+              "installation/macos",
+              "installation/linux",
+              "installation/docker"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/configuration",
+              "concepts/characters"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "User Guide",
+        "groups": [
+          {
+            "group": "Configuration",
+            "pages": [
+              "user-guide/configuration-overview",
+              "user-guide/character-customization",
+              "user-guide/live2d-models"
+            ]
+          },
+          {
+            "group": "LLM Backends",
+            "pages": [
+              "user-guide/llm/overview",
+              "user-guide/llm/ollama",
+              "user-guide/llm/openai-compatible",
+              "user-guide/llm/cloud-providers"
+            ]
+          },
+          {
+            "group": "Speech Recognition (ASR)",
+            "pages": [
+              "user-guide/asr/overview",
+              "user-guide/asr/sherpa-onnx",
+              "user-guide/asr/faster-whisper",
+              "user-guide/asr/cloud-asr"
+            ]
+          },
+          {
+            "group": "Text-to-Speech (TTS)",
+            "pages": [
+              "user-guide/tts/overview",
+              "user-guide/tts/edge-tts",
+              "user-guide/tts/local-tts",
+              "user-guide/tts/cloud-tts"
+            ]
+          },
+          {
+            "group": "Advanced Features",
+            "pages": [
+              "user-guide/voice-interruption",
+              "user-guide/visual-perception",
+              "user-guide/pet-mode",
+              "user-guide/live-streaming",
+              "user-guide/mcp-tools"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development Guide",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "development-guide/overview",
+              "development-guide/project-structure"
+            ]
+          },
+          {
+            "group": "Extending the System",
+            "pages": [
+              "development-guide/custom-llm",
+              "development-guide/custom-asr",
+              "development-guide/custom-tts",
+              "development-guide/custom-agent"
+            ]
+          },
+          {
+            "group": "WebSocket API",
+            "pages": [
+              "development-guide/websocket-protocol",
+              "development-guide/message-types"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "development-guide/contributing",
+              "development-guide/code-style"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Real-time voice conversations with hands-free, headphone-free voice interruption",
+    "Live2D avatar with expression control driven by LLM output",
+    "Fully offline operation — all models run locally on your machine",
+    "Cross-platform support for Windows, macOS, and Linux",
+    "Modular engine system: swap LLM, ASR, and TTS backends via config file",
+    "Desktop pet mode with transparent background and always-on-top window",
+    "Visual perception — AI can see your screen or camera feed",
+    "MCP (Model Context Protocol) tool integration for extended AI capabilities",
+    "Live streaming integration (Bilibili) for AI VTuber broadcasts",
+    "Multi-character support with persona prompts and voice cloning"
+  ],
+  "publicApiSurface": [
+    "WebSocketServer (src/open_llm_vtuber/server.py)",
+    "ServiceContext (src/open_llm_vtuber/service_context.py)",
+    "AgentInterface (src/open_llm_vtuber/agent/agents/agent_interface.py)",
+    "ASRInterface (src/open_llm_vtuber/asr/asr_interface.py)",
+    "TTSInterface (src/open_llm_vtuber/tts/tts_interface.py)",
+    "AgentFactory (src/open_llm_vtuber/agent/agent_factory.py)",
+    "ASRFactory (src/open_llm_vtuber/asr/asr_factory.py)",
+    "TTSFactory (src/open_llm_vtuber/tts/tts_factory.py)",
+    "Config (src/open_llm_vtuber/config_manager/utils.py)",
+    "WebSocket endpoint: /client-ws",
+    "WebSocket endpoint: /proxy-ws",
+    "conf.yaml (user configuration file)"
+  ]
+}
