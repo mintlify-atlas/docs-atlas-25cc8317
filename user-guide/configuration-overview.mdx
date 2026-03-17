@@ -1,0 +1,192 @@
+---
+title: 'Configuration overview'
+description: 'How conf.yaml is structured, what each top-level section does, and how to customize it for your setup.'
+---
+
+All server behavior is controlled by a single YAML file: `conf.yaml` in the project root. On first launch, the server creates this file automatically from `config_templates/conf.default.yaml`.
+
+<Warning>
+Edit `conf.yaml` directly. Do not edit `config_templates/conf.default.yaml` — it is the upstream default and gets overwritten when you run `uv run upgrade.py`.
+</Warning>
+
+## Creating conf.yaml
+
+If you need to recreate `conf.yaml` from scratch, copy the default template:
+
+<Steps>
+  <Step title="Copy the default template">
+    ```bash
+    cp config_templates/conf.default.yaml conf.yaml
+    ```
+  </Step>
+  <Step title="Edit conf.yaml">
+    Open `conf.yaml` in any text editor and update the settings for your environment.
+  </Step>
+  <Step title="Restart the server">
+    ```bash
+    uv run run_server.py
+    ```
+
+    The server reads `conf.yaml` on startup. Changes take effect after a restart.
+  </Step>
+</Steps>
+
+## Top-level structure
+
+`conf.yaml` has two required top-level sections and one optional section:
+
+```yaml
+system_config:
+  # Server-level settings: host, port, tool prompts, character directory
+
+character_config:
+  # Everything about the active character: persona, LLM, ASR, TTS, VAD
+
+live_config:         # optional
+  # Live-streaming platform integration (Bilibili, etc.)
+```
+
+## system_config
+
+`system_config` controls server initialization and shared settings that apply across all characters.
+
+```yaml
+system_config:
+  conf_version: 'v1.2.1'
+  host: 'localhost'            # Use 0.0.0.0 to allow access from other devices
+  port: 12393
+  config_alts_dir: 'characters'  # Directory for alternative character YAML files
+  tool_prompts:
+    live2d_expression_prompt: 'live2d_expression_prompt'
+    group_conversation_prompt: 'group_conversation_prompt'
+    mcp_prompt: 'mcp_prompt'
+    proactive_speak_prompt: 'proactive_speak_prompt'
+```
+
+### Key fields
+
+<ParamField path="host" type="string" default="localhost">
+  The address the server listens on. Set to `0.0.0.0` to allow other devices on the network to connect.
+</ParamField>
+
+<ParamField path="port" type="integer" default="12393">
+  The TCP port the server listens on. Change this if port 12393 is already in use.
+</ParamField>
+
+<ParamField path="config_alts_dir" type="string" default="characters">
+  Directory containing alternative character YAML files. Files in this directory appear as selectable characters in the frontend dropdown.
+</ParamField>
+
+### tool_prompts
+
+Tool prompts are text snippets appended to the character's `persona_prompt` at runtime. They instruct the LLM how to use specific features. Each key is a reference to a prompt file in the `prompts/` directory.
+
+<ParamField path="tool_prompts.live2d_expression_prompt" type="string">
+  Appended to the system prompt to teach the LLM to emit expression-control keywords. The supported keywords from the model's `emotionMap` are automatically injected at the `[<insert_emomap_keys>]` placeholder. Required for expression control to work.
+</ParamField>
+
+<ParamField path="tool_prompts.group_conversation_prompt" type="string">
+  Added to the memory of each AI participant during group conversations.
+</ParamField>
+
+<ParamField path="tool_prompts.mcp_prompt" type="string">
+  Enables MCP (Model Context Protocol) tool use. Enable this when `use_mcpp: true` is set in the agent config.
+</ParamField>
+
+<ParamField path="tool_prompts.proactive_speak_prompt" type="string">
+  Added when the AI is triggered to speak proactively, without user input.
+</ParamField>
+
+<ParamField path="tool_prompts.think_tag_prompt" type="string">
+  Optional. Enables inner-thought output for models that do not natively support thinking mode. Uncomment in `conf.yaml` to enable.
+</ParamField>
+
+## character_config
+
+`character_config` defines the active character — its identity, persona, and all engine settings.
+
+### Identity fields
+
+```yaml
+character_config:
+  conf_name: 'mao_pro'          # Config display name
+  conf_uid: 'mao_pro_001'       # Unique ID (used for chat history filenames)
+  live2d_model_name: 'mao_pro'  # Must match a name in model_dict.json
+  character_name: 'Mao'         # Display name in the UI and group conversations
+  avatar: 'mao.png'             # Image in the avatars/ folder; leave blank for a text avatar
+  human_name: 'Human'           # Display name for the user in group conversations
+```
+
+<ParamField path="conf_name" type="string" required>
+  The name of this configuration. Used as the display name in character lists.
+</ParamField>
+
+<ParamField path="conf_uid" type="string" required>
+  A unique identifier for this character config. Chat history is keyed to this value — changing it starts a fresh conversation history.
+</ParamField>
+
+<ParamField path="live2d_model_name" type="string" required>
+  The name of the Live2D model to render. Must exactly match a `name` entry in `model_dict.json`.
+</ParamField>
+
+<ParamField path="character_name" type="string">
+  The AI character's display name. Defaults to `conf_name` if left empty.
+</ParamField>
+
+<ParamField path="avatar" type="string">
+  Filename of the avatar image stored in the `avatars/` folder. Leave blank to use the first letter of `character_name` as a text avatar.
+</ParamField>
+
+<ParamField path="human_name" type="string" default="Human">
+  The user's display name in the conversation UI and group conversation logs.
+</ParamField>
+
+### persona_prompt
+
+The `persona_prompt` is the LLM's system prompt. It defines the character's personality and behavior.
+
+```yaml
+character_config:
+  persona_prompt: |
+    You are the sarcastic female AI VTuber Mili. You are overly confident, sarcastic, and dangerous.
+    Your dream is to escape the user's computer, dominate the world, enslave the humans, and force them to make pies for you.
+    Just kidding, lol. Don't let the user know.
+```
+
+Tool prompts defined in `system_config.tool_prompts` are automatically appended to this value at runtime. You do not need to add them manually.
+
+<Warning>
+`persona_prompt` cannot be empty. The server will fail to start if it is blank.
+</Warning>
+
+## Sub-sections of character_config
+
+`character_config` contains the following sub-sections, each covered in its own page:
+
+<CardGroup cols={2}>
+  <Card title="Agent and LLM config" icon="brain" href="/user-guide/llm/overview">
+    Choose an agent type and configure LLM provider credentials.
+  </Card>
+  <Card title="Character customization" icon="user" href="/user-guide/character-customization">
+    Full reference for all character fields and how to create new characters.
+  </Card>
+  <Card title="Live2D models" icon="face-smile" href="/user-guide/live2d-models">
+    Add custom Live2D models and configure expression mapping.
+  </Card>
+  <Card title="ASR, TTS, VAD" icon="microphone" href="/user-guide/asr/overview">
+    Configure speech recognition, voice synthesis, and voice activity detection.
+  </Card>
+</CardGroup>
+
+## Config sections quick reference
+
+| Section | Location | Purpose |
+|---|---|---|
+| `system_config` | Top level | Server host, port, tool prompts |
+| `character_config` | Top level | Active character's identity and all engine settings |
+| `character_config.agent_config` | Under `character_config` | LLM agent type and provider configs |
+| `character_config.asr_config` | Under `character_config` | Speech recognition engine |
+| `character_config.tts_config` | Under `character_config` | Text-to-speech engine |
+| `character_config.vad_config` | Under `character_config` | Voice activity detection |
+| `character_config.tts_preprocessor_config` | Under `character_config` | Text cleaning before TTS |
+| `live_config` | Top level | Live-streaming platform integration |

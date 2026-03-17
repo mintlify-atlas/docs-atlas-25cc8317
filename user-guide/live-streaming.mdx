@@ -1,0 +1,96 @@
+---
+title: 'Live streaming'
+description: 'Connect Open LLM VTuber to a Bilibili live room so the AI reads and responds to chat messages.'
+---
+
+Open LLM VTuber can monitor Bilibili live chat and forward danmaku (chat messages) to the AI as if they were spoken by a user. The AI reads the messages and responds in real time.
+
+## How it works
+
+The live streaming integration runs as a separate process alongside the main server:
+
+1. `scripts/run_bilibili_live.py` connects to the Bilibili live room using the `blivedm` library.
+2. Incoming danmaku messages are forwarded to the server's proxy WebSocket endpoint at `ws://localhost:12393/proxy-ws`.
+3. The server processes each message through the normal conversation pipeline — LLM → TTS → Live2D.
+
+## Installation
+
+The Bilibili live integration requires additional dependencies.
+
+<Steps>
+  <Step title="Install the bilibili extra">
+    ```bash
+    uv sync --extra bilibili
+    ```
+
+    This installs all packages listed in `requirements-bilibili.txt`, including `aiohttp`, `websocket-client`, and `sherpa-onnx`.
+  </Step>
+  <Step title="Start the main server">
+    The main server must be running before you start the live client.
+
+    ```bash
+    uv run run_server.py
+    ```
+  </Step>
+</Steps>
+
+## Configuration
+
+Live streaming settings are in the `live_config` top-level section of `conf.yaml`:
+
+```yaml
+live_config:
+  bilibili_live:
+    room_ids:
+      - 1991478060    # Replace with your Bilibili live room ID
+    sessdata: ''      # Optional: SESSDATA cookie for authenticated requests
+```
+
+<ParamField path="live_config.bilibili_live.room_ids" type="array" required>
+  List of Bilibili live room IDs to monitor. The client picks one room ID at random from the list on each run. To monitor a single room, provide one ID.
+</ParamField>
+
+<ParamField path="live_config.bilibili_live.sessdata" type="string">
+  Optional. The `SESSDATA` cookie value from a logged-in Bilibili session. Required to access rooms that have restricted access or to participate as an authenticated user. Leave blank for public rooms.
+</ParamField>
+
+### Finding your room ID
+
+Your Bilibili live room ID is the number in the URL when viewing your live room:
+
+```
+https://live.bilibili.com/1991478060
+                             ↑ this is the room ID
+```
+
+### Getting SESSDATA
+
+To get the `SESSDATA` cookie:
+
+1. Log in to Bilibili in your browser.
+2. Open DevTools → Application → Cookies → `https://bilibili.com`.
+3. Find the `SESSDATA` cookie and copy its value.
+
+## Running the live client
+
+With the main server running, start the Bilibili live client in a separate terminal:
+
+```bash
+uv run scripts/run_bilibili_live.py
+```
+
+The client connects to the configured room(s) and begins forwarding danmaku to the server. You should see the AI responding to chat messages.
+
+## Behavior
+
+- The client randomly selects one room from `room_ids` on each run. If you need to monitor multiple rooms simultaneously, start multiple instances with different configs.
+- Danmaku messages are sent to the server one at a time as text input. The AI processes and responds to each message through the full conversation pipeline.
+- The live client does not send responses back to the Bilibili chat. It only receives messages and passes them to the AI.
+
+## Stopping the live client
+
+Press `Ctrl+C` in the terminal running `run_bilibili_live.py`. The client disconnects cleanly from both the Bilibili room and the server proxy.
+
+<Note>
+The main server does not need to be restarted to start or stop the live client. You can start and stop the live client independently.
+</Note>

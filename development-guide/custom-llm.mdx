@@ -1,0 +1,174 @@
+---
+title: Adding a custom LLM provider
+description: How to add a new stateless LLM backend by implementing StatelessLLMInterface and registering it in LLMFactory.
+---
+
+Open LLM VTuber separates the concern of "calling an LLM" from the concern of "managing conversation memory". **Stateless LLMs** only receive a list of messages and return a streamed response — they never store state. Memory, system prompts, and tool calls are handled by the **Agent** layer on top.
+
+This page explains how to add a new stateless LLM provider.
+
+## The `StatelessLLMInterface`
+
+All LLM backends must implement the abstract class at `src/open_llm_vtuber/agent/stateless_llm/stateless_llm_interface.py`:
+
+```python stateless_llm_interface.py
+import abc
+from typing import AsyncIterator, List, Dict, Any
+
+
+class StatelessLLMInterface(metaclass=abc.ABCMeta):
+    """
+    Interface for a stateless language model.
+
+    The word "stateless" means that the language model does not store memory,
+    system prompts, or user messages. If we send a message to the LLM, its
+    response will be based on the message parameter alone.
+    """
+
+    @abc.abstractmethod
+    async def chat_completion(
+        self,
+        messages: List[Dict[str, Any]],
+        system: str = None,
+        tools: List[Dict[str, Any]] = None,
+    ) -> AsyncIterator[str]:
+        """
+        Generates a chat completion asynchronously.
+
+        Parameters:
+        - messages: The list of messages to send to the API.
+        - system: Optional system prompt for this completion.
+        - tools: Optional list of tool definitions.
+
+        Yields:
+        - str: Content chunks from the API response.
+
+        Raises:
+        - APIConnectionError, RateLimitError, APIError
+        """
+        raise NotImplementedError
+```
+
+The method must be an **async generator** — it yields text chunks as they arrive from the upstream API.
+
+## Existing implementations
+
+Before writing your own, check whether an existing implementation already handles your use case:
+
+| Provider key | Class | Notes |
+|---|---|---|
+| `openai_compatible_llm` | `AsyncLLM` | Works with any OpenAI-compatible endpoint |
+| `ollama_llm` | `OllamaLLM` | Wraps `AsyncLLM` with Ollama preload/unload |
+| `claude_llm` | `AsyncLLM` (Claude variant) | Uses the Anthropic SDK |
+| `stateless_llm_with_template` | `AsyncLLMWithTemplate` | Adds a prompt template layer |
+| `llama_cpp_llm` | `LLM` | Local llama.cpp inference |
+
+Many providers (Gemini, Groq, Mistral, DeepSeek, LM Studio, ZhipuAI) are already handled by `openai_compatible_llm` because they expose an OpenAI-compatible chat completions endpoint.
+
+## Step-by-step: adding a new provider
+
+<Steps>
+  <Step title="Create the implementation file">
+    Create a new file in `src/open_llm_vtuber/agent/stateless_llm/`. Use an existing implementation as a reference — `openai_compatible_llm.py` is the most complete example.
+
+    ```python my_custom_llm.py
+    from typing import AsyncIterator, List, Dict, Any
+    from .stateless_llm_interface import StatelessLLMInterface
+
+
+    class MyCustomLLM(StatelessLLMInterface):
+        def __init__(self, model: str, api_key: str, base_url: str):
+            self.model = model
+            self.api_key = api_key
+            self.base_url = base_url
+            # Initialize your client here
+
+        async def chat_completion(
+            self,
+            messages: List[Dict[str, Any]],
+            system: str = None,
+            tools: List[Dict[str, Any]] = None,
+        ) -> AsyncIterator[str]:
+            # If a system prompt is provided, prepend it
+            if system:
+                messages = [{"role": "system", "content": system}, *messages]
+
+            # Call your provider's streaming API and yield chunks
+            async for chunk in your_api_call(messages):
+                yield chunk
+    ```
+
+    <Tip>
+    If your provider follows the OpenAI chat completions API spec, you can subclass `AsyncLLM` from `openai_compatible_llm.py` and simply pass the correct `base_url` and credentials. No need to implement `chat_completion` yourself.
+    </Tip>
+  </Step>
+
+  <Step title="Register in LLMFactory">
+    Open `src/open_llm_vtuber/agent/stateless_llm_factory.py` and add a new branch:
+
+    ```python stateless_llm_factory.py
+    class LLMFactory:
+        @staticmethod
+        def create_llm(llm_provider, **kwargs) -> Type[StatelessLLMInterface]:
+            # ... existing branches ...
+
+            elif llm_provider == "my_custom_llm":
+                from .stateless_llm.my_custom_llm import MyCustomLLM
+
+                return MyCustomLLM(
+                    model=kwargs.get("model"),
+                    api_key=kwargs.get("api_key"),
+                    base_url=kwargs.get("base_url"),
+                )
+
+            else:
+                raise ValueError(f"Unsupported LLM provider: {llm_provider}")
+    ```
+
+    <Note>
+    Use a lazy import inside the `elif` branch so the new dependency is only imported when the provider is actually selected. This keeps startup time fast for users who do not use your provider.
+    </Note>
+  </Step>
+
+  <Step title="Add a configuration class">
+    Configuration for each LLM provider is validated by a Pydantic model in `src/open_llm_vtuber/config_manager/stateless_llm.py`. Add a new model for your provider:
+
+    ```python config_manager/stateless_llm.py
+    class MyCustomLLMConfig(BaseModel):
+        model: str = "my-model-name"
+        api_key: str = ""
+        base_url: str = "https://api.example.com/v1"
+    ```
+
+    Then add it as an optional field on the parent `LLMConfig` class so the config manager can deserialise it from YAML.
+  </Step>
+
+  <Step title="Update the default configuration templates">
+    Add an example configuration block to **both** default templates:
+
+    - `config_templates/conf.default.yaml`
+    - `config_templates/conf.ZH.default.yaml`
+
+    ```yaml conf.default.yaml
+    # Under the llm_configs section:
+    my_custom_llm:
+      model: "my-model-name"
+      api_key: "your-api-key"
+      base_url: "https://api.example.com/v1"
+    ```
+  </Step>
+
+  <Step title="Test the integration">
+    Set `conversation_agent_choice: basic_memory_agent` and `llm_provider: my_custom_llm` in your `conf.yaml`, then run:
+
+    ```bash
+    uv run run_server.py --verbose
+    ```
+
+    Check the logs for `Initializing LLM: my_custom_llm` and verify the model responds correctly.
+  </Step>
+</Steps>
+
+## Tool call support
+
+If your provider supports function/tool calling, yield `List[ToolCallObject]` items alongside text chunks. Look at `openai_compatible_llm.py` for the complete tool call accumulation pattern. If the provider does not support tools, set `self.support_tools = False` or catch the relevant API error and disable tools dynamically (as `AsyncLLM` does).

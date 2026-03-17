@@ -1,0 +1,286 @@
+---
+title: 'Cloud LLM providers'
+description: 'Configure OpenAI, Anthropic Claude, Google Gemini, DeepSeek, Groq, ZhiPu, and Mistral as LLM backends.'
+---
+
+All cloud providers in Open LLM VTuber are configured under `character_config.agent_config.llm_configs`. Set the matching `llm_provider` key in `basic_memory_agent.agent_settings` to activate a provider.
+
+<Warning>
+Never commit API keys to version control. Use environment variables or a secrets manager for production deployments.
+</Warning>
+
+## OpenAI
+
+Uses the official OpenAI API at `https://api.openai.com/v1`.
+
+```yaml
+llm_configs:
+  openai_llm:
+    llm_api_key: 'sk-your-openai-api-key'
+    model: 'gpt-4o'
+    temperature: 1.0
+```
+
+<ParamField path="llm_api_key" type="string" required>
+  Your OpenAI API key. Get it from [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The OpenAI model to use. Examples: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-3.5-turbo`.
+</ParamField>
+
+<ParamField path="temperature" type="number" default="1.0">
+  Sampling temperature between `0` and `2`.
+</ParamField>
+
+Enable:
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'openai_llm'
+```
+
+## Anthropic Claude
+
+Uses the Anthropic API. The `claude_llm` provider uses the `anthropic` Python SDK directly rather than the OpenAI-compatible interface.
+
+```yaml
+llm_configs:
+  claude_llm:
+    base_url: 'https://api.anthropic.com'
+    llm_api_key: 'sk-ant-your-claude-api-key'
+    model: 'claude-3-haiku-20240307'
+```
+
+<ParamField path="base_url" type="string" default="https://api.anthropic.com">
+  The Anthropic API base URL. Change this only if using a custom proxy or an Anthropic-compatible endpoint.
+</ParamField>
+
+<ParamField path="llm_api_key" type="string" required>
+  Your Anthropic API key. Get it from [console.anthropic.com](https://console.anthropic.com).
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The Claude model identifier. Examples:
+  - `claude-3-haiku-20240307` — Fastest and most cost-effective.
+  - `claude-3-5-sonnet-20241022` — Best balance of capability and cost.
+  - `claude-3-5-haiku-20241022` — Faster Claude 3.5.
+  - `claude-3-opus-20240229` — Most capable Claude 3 model.
+</ParamField>
+
+Enable:
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'claude_llm'
+```
+
+<Note>
+Claude uses the `anthropic` SDK, which handles message formatting differently from the OpenAI-compatible providers. It does not support `organization_id` or `project_id`.
+</Note>
+
+## Google Gemini
+
+Uses Google's Gemini API via its OpenAI-compatible endpoint.
+
+```yaml
+llm_configs:
+  gemini_llm:
+    llm_api_key: 'your-gemini-api-key'
+    model: 'gemini-2.0-flash-exp'
+    temperature: 1.0
+```
+
+<ParamField path="llm_api_key" type="string" required>
+  Your Google AI Studio API key. Get it from [aistudio.google.com](https://aistudio.google.com).
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The Gemini model identifier. Examples: `gemini-2.0-flash-exp`, `gemini-1.5-flash`, `gemini-1.5-pro`.
+</ParamField>
+
+<ParamField path="temperature" type="number" default="1.0">
+  Sampling temperature between `0` and `2`.
+</ParamField>
+
+Enable:
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'gemini_llm'
+```
+
+## DeepSeek
+
+Uses the DeepSeek API.
+
+```yaml
+llm_configs:
+  deepseek_llm:
+    llm_api_key: 'your-deepseek-api-key'
+    model: 'deepseek-chat'
+    temperature: 0.7
+```
+
+<ParamField path="llm_api_key" type="string" required>
+  Your DeepSeek API key. Get it from [platform.deepseek.com](https://platform.deepseek.com).
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The DeepSeek model identifier. Examples: `deepseek-chat`, `deepseek-reasoner`.
+</ParamField>
+
+<ParamField path="temperature" type="number" default="0.7">
+  Sampling temperature. **DeepSeek's temperature range is `0` to `1`**, unlike most other providers which use `0` to `2`. Do not exceed `1.0` for DeepSeek.
+</ParamField>
+
+Enable:
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'deepseek_llm'
+```
+
+<Warning>
+DeepSeek's `temperature` parameter is capped at `1.0`. Setting it higher than `1.0` may cause API errors or unexpected behavior.
+</Warning>
+
+## Groq
+
+Uses the Groq cloud inference API, which provides fast inference for open models.
+
+```yaml
+llm_configs:
+  groq_llm:
+    llm_api_key: 'your-groq-api-key'
+    model: 'llama-3.3-70b-versatile'
+    temperature: 1.0
+```
+
+<ParamField path="llm_api_key" type="string" required>
+  Your Groq API key. Get it from [console.groq.com](https://console.groq.com).
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The Groq model identifier. Examples: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`.
+</ParamField>
+
+<ParamField path="temperature" type="number" default="1.0">
+  Sampling temperature between `0` and `2`.
+</ParamField>
+
+Enable:
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'groq_llm'
+```
+
+## ZhiPu AI
+
+Uses the ZhiPu AI API (GLM series models).
+
+```yaml
+llm_configs:
+  zhipu_llm:
+    llm_api_key: 'your-zhipu-api-key'
+    model: 'glm-4-flash'
+    temperature: 1.0
+```
+
+<ParamField path="llm_api_key" type="string" required>
+  Your ZhiPu AI API key. Get it from the ZhiPu AI open platform.
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The ZhiPu model identifier. Examples: `glm-4-flash`, `glm-4-plus`, `glm-4`.
+</ParamField>
+
+<ParamField path="temperature" type="number" default="1.0">
+  Sampling temperature between `0` and `2`.
+</ParamField>
+
+Enable:
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'zhipu_llm'
+```
+
+## Mistral
+
+Uses the Mistral AI API.
+
+```yaml
+llm_configs:
+  mistral_llm:
+    llm_api_key: 'your-mistral-api-key'
+    model: 'pixtral-large-latest'
+    temperature: 1.0
+```
+
+<ParamField path="llm_api_key" type="string" required>
+  Your Mistral API key. Get it from [console.mistral.ai](https://console.mistral.ai).
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The Mistral model identifier. Examples: `pixtral-large-latest`, `mistral-large-latest`, `mistral-small-latest`, `open-mistral-nemo`.
+</ParamField>
+
+<ParamField path="temperature" type="number" default="1.0">
+  Sampling temperature between `0` and `2`.
+</ParamField>
+
+Enable:
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'mistral_llm'
+```
+
+## Full example: switching between providers
+
+You can define multiple providers in `llm_configs` and switch between them by changing only `llm_provider`:
+
+```yaml
+character_config:
+  agent_config:
+    agent_settings:
+      basic_memory_agent:
+        llm_provider: 'claude_llm'   # Change this to switch providers
+        faster_first_response: true
+        segment_method: 'pysbd'
+
+    llm_configs:
+      openai_llm:
+        llm_api_key: 'sk-your-openai-key'
+        model: 'gpt-4o'
+        temperature: 1.0
+
+      claude_llm:
+        base_url: 'https://api.anthropic.com'
+        llm_api_key: 'sk-ant-your-claude-key'
+        model: 'claude-3-haiku-20240307'
+
+      gemini_llm:
+        llm_api_key: 'your-gemini-key'
+        model: 'gemini-2.0-flash-exp'
+        temperature: 1.0
+
+      groq_llm:
+        llm_api_key: 'your-groq-key'
+        model: 'llama-3.3-70b-versatile'
+        temperature: 1.0
+```
+
+## Provider comparison
+
+| Provider | Key | Default model | Temperature range | Notes |
+|---|---|---|---|---|
+| OpenAI | `openai_llm` | `gpt-4o` | 0–2 | Official OpenAI API |
+| Claude | `claude_llm` | `claude-3-haiku-20240307` | 0–2 | Uses Anthropic SDK |
+| Gemini | `gemini_llm` | `gemini-2.0-flash-exp` | 0–2 | OpenAI-compatible endpoint |
+| DeepSeek | `deepseek_llm` | `deepseek-chat` | **0–1** | Temperature capped at 1.0 |
+| Groq | `groq_llm` | `llama-3.3-70b-versatile` | 0–2 | Fast inference |
+| ZhiPu | `zhipu_llm` | `glm-4-flash` | 0–2 | GLM series models |
+| Mistral | `mistral_llm` | `pixtral-large-latest` | 0–2 | Mistral AI API |

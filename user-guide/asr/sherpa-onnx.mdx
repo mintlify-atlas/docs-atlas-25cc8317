@@ -1,0 +1,194 @@
+---
+title: 'Sherpa-ONNX ASR'
+description: 'Configure the default offline ASR engine — model types, providers, and download instructions.'
+---
+
+Sherpa-ONNX is the default ASR engine in Open LLM VTuber. It runs entirely offline using ONNX-format models. The SenseVoice model is pre-configured and auto-downloads on first run — no manual setup is required to get started.
+
+## Quick start
+
+The default config works without any changes:
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'sherpa_onnx_asr'
+
+    sherpa_onnx_asr:
+      model_type: 'sense_voice'
+      sense_voice: './models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/model.int8.onnx'
+      tokens: './models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt'
+      num_threads: 4
+      use_itn: true
+      provider: 'cpu'
+```
+
+When the server starts, if the SenseVoice model files are not found at the configured path, they are downloaded automatically from the sherpa-onnx GitHub releases.
+
+## Model types
+
+Set `model_type` to select the architecture, then provide the required file paths for that type.
+
+### sense_voice (default)
+
+Multilingual offline ASR supporting Chinese, English, Japanese, Korean, and Cantonese. Auto-downloads on first run.
+
+```yaml
+sherpa_onnx_asr:
+  model_type: 'sense_voice'
+  sense_voice: './models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/model.int8.onnx'
+  tokens: './models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt'
+  use_itn: true
+```
+
+`use_itn` enables Inverse Text Normalization — it converts spoken numbers and abbreviations to written form (e.g., "twenty three" → "23"). Set to `false` for non-SenseVoice models.
+
+### transducer
+
+Supports models from k2-fsa, Icefall, and compatible toolkits.
+
+```yaml
+sherpa_onnx_asr:
+  model_type: 'transducer'
+  encoder: 'path/to/encoder.onnx'
+  decoder: 'path/to/decoder.onnx'
+  joiner: 'path/to/joiner.onnx'
+  tokens: 'path/to/tokens.txt'
+```
+
+### paraformer
+
+Fudan/Alibaba Paraformer model, strong for Mandarin Chinese.
+
+```yaml
+sherpa_onnx_asr:
+  model_type: 'paraformer'
+  paraformer: 'path/to/model.onnx'
+  tokens: 'path/to/tokens.txt'
+```
+
+### whisper
+
+Whisper models exported to ONNX format.
+
+```yaml
+sherpa_onnx_asr:
+  model_type: 'whisper'
+  whisper_encoder: 'path/to/encoder.onnx'
+  whisper_decoder: 'path/to/decoder.onnx'
+  tokens: 'path/to/tokens.txt'
+  whisper_language: 'en'         # Optional: language code, or leave blank for auto
+  whisper_task: 'transcribe'     # 'transcribe' or 'translate'
+```
+
+### nemo_ctc
+
+NVIDIA NeMo CTC models.
+
+```yaml
+sherpa_onnx_asr:
+  model_type: 'nemo_ctc'
+  nemo_ctc: 'path/to/model.onnx'
+  tokens: 'path/to/tokens.txt'
+```
+
+### wenet_ctc
+
+WeNet CTC models.
+
+```yaml
+sherpa_onnx_asr:
+  model_type: 'wenet_ctc'
+  wenet_ctc: 'path/to/model.onnx'
+  tokens: 'path/to/tokens.txt'
+```
+
+### tdnn_ctc
+
+TDNN CTC models (typically used for the Yesno recipe).
+
+```yaml
+sherpa_onnx_asr:
+  model_type: 'tdnn_ctc'
+  tdnn_model: 'path/to/model.onnx'
+  tokens: 'path/to/tokens.txt'
+```
+
+### fire_red_asr
+
+FireRedASR — high-performance model with strong support for Chinese, English, and Chinese dialects.
+
+```yaml
+sherpa_onnx_asr:
+  model_type: 'fire_red_asr'
+  fire_red_asr_encoder: 'path/to/encoder.onnx'
+  fire_red_asr_decoder: 'path/to/decoder.onnx'
+  tokens: 'path/to/tokens.txt'
+```
+
+## Full configuration reference
+
+<ParamField path="model_type" type="string" required>
+  Architecture of the model. One of: `sense_voice`, `transducer`, `paraformer`, `nemo_ctc`, `wenet_ctc`, `tdnn_ctc`, `whisper`, `fire_red_asr`.
+</ParamField>
+
+<ParamField path="tokens" type="string" required>
+  Path to the `tokens.txt` file. Required for all model types.
+</ParamField>
+
+<ParamField path="num_threads" type="integer" default="4">
+  Number of CPU threads used for inference. Increase for faster transcription on systems with many cores.
+</ParamField>
+
+<ParamField path="use_itn" type="boolean" default="true">
+  Enable Inverse Text Normalization. Only effective with `sense_voice` models. Set to `false` for all other model types.
+</ParamField>
+
+<ParamField path="provider" type="string" default="cpu">
+  Inference provider. `cpu` works everywhere. `cuda` requires `onnxruntime-gpu` and a compatible NVIDIA GPU. Falls back to `cpu` automatically if CUDA is unavailable.
+</ParamField>
+
+<ParamField path="decoding_method" type="string" default="greedy_search">
+  Decoding algorithm. `greedy_search` is fastest. `modified_beam_search` may improve accuracy at the cost of speed.
+</ParamField>
+
+<ParamField path="debug" type="boolean" default="false">
+  Enable debug logging from the sherpa-onnx library.
+</ParamField>
+
+## Downloading models
+
+All available sherpa-onnx ASR models are listed on the GitHub releases page:
+
+`https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models`
+
+Download the archive, extract it, and update the path fields in your config to point to the extracted files.
+
+<Note>
+For `sense_voice`, you do not need to download the model manually. It downloads automatically when the model file is not found at the configured path.
+</Note>
+
+## FunASR alternative
+
+`fun_asr` is another offline-capable option based on Alibaba's FunASR framework. It supports `iic/SenseVoiceSmall` and `paraformer-zh` models.
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'fun_asr'
+
+    fun_asr:
+      model_name: 'iic/SenseVoiceSmall'
+      vad_model: 'fsmn-vad'
+      punc_model: 'ct-punc'
+      device: 'cpu'
+      disable_update: true
+      ncpu: 4
+      hub: 'ms'      # 'ms' for ModelScope, 'hf' for Hugging Face
+      use_itn: false
+      language: 'auto'
+```
+
+<Warning>
+`fun_asr` contacts ModelScope or Hugging Face on every launch to check for model updates, even when `disable_update: true` is set. Use `sherpa_onnx_asr` for a fully offline experience.
+</Warning>

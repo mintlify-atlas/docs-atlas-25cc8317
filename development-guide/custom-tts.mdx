@@ -1,0 +1,219 @@
+---
+title: Adding a custom TTS engine
+description: How to add a new text-to-speech backend by implementing TTSInterface and registering it in TTSFactory.
+---
+
+TTS engines in Open LLM VTuber receive a text string and write an audio file to disk. They return the path to that file, which is then streamed back to the client over WebSocket.
+
+## The `TTSInterface`
+
+Defined at `src/open_llm_vtuber/tts/tts_interface.py`:
+
+```python tts_interface.py
+import abc
+import os
+import asyncio
+
+
+class TTSInterface(metaclass=abc.ABCMeta):
+    async def async_generate_audio(self, text: str, file_name_no_ext=None) -> str:
+        """
+        Asynchronously generate speech audio.
+
+        By default, runs the synchronous generate_audio in a thread.
+        Subclasses can override this for a native async implementation.
+
+        Returns:
+            str: Path to the generated audio file.
+        """
+        return await asyncio.to_thread(self.generate_audio, text, file_name_no_ext)
+
+    @abc.abstractmethod
+    def generate_audio(self, text: str, file_name_no_ext=None) -> str:
+        """
+        Generate speech audio file using TTS.
+
+        Args:
+            text: The text to speak.
+            file_name_no_ext: Optional file name without extension (deprecated).
+
+        Returns:
+            str: Path to the generated audio file.
+        """
+        raise NotImplementedError
+
+    def remove_file(self, filepath: str, verbose: bool = True) -> None:
+        """Remove a generated audio file after playback."""
+        ...
+
+    def generate_cache_file_name(self, file_name_no_ext=None, file_extension="wav") -> str:
+        """Generate a cross-platform path inside the cache/ directory."""
+        ...
+```
+
+**You must implement `generate_audio`.** The base class provides:
+
+- `async_generate_audio` — runs your method in a thread pool automatically.
+- `generate_cache_file_name` — generates a path like `cache/temp.wav`, creating the `cache/` directory if needed.
+- `remove_file` — deletes the audio file after playback.
+
+## Real example: `edge_tts.py`
+
+The Edge TTS implementation (`src/open_llm_vtuber/tts/edge_tts.py`) is the simplest complete example:
+
+```python edge_tts.py
+import edge_tts
+from loguru import logger
+from .tts_interface import TTSInterface
+
+
+class TTSEngine(TTSInterface):
+    def __init__(self, voice="en-US-AvaMultilingualNeural"):
+        self.voice = voice
+        self.file_extension = "mp3"
+        self.new_audio_dir = "cache"
+
+        if not os.path.exists(self.new_audio_dir):
+            os.makedirs(self.new_audio_dir)
+
+    def generate_audio(self, text, file_name_no_ext=None):
+        file_name = self.generate_cache_file_name(file_name_no_ext, self.file_extension)
+
+        try:
+            communicate = edge_tts.Communicate(text, self.voice)
+            communicate.save_sync(file_name)
+        except Exception as e:
+            logger.critical(f"edge-tts unable to generate audio: {e}")
+            return None
+
+        return file_name
+```
+
+Key points:
+- Use `generate_cache_file_name` from the base class to get the output path.
+- Return `None` on failure (the conversation pipeline handles `None` gracefully).
+- Return the full file path on success.
+
+## Existing TTS backends
+
+| Provider key | Class | Notes |
+|---|---|---|
+| `edge_tts` | `TTSEngine` | Free Microsoft Edge TTS |
+| `azure_tts` | `TTSEngine` | Azure Cognitive Services |
+| `openai_tts` | `TTSEngine` | OpenAI TTS API (also works with Kokoro) |
+| `elevenlabs_tts` | `TTSEngine` | ElevenLabs API |
+| `cartesia_tts` | `TTSEngine` | Cartesia API |
+| `gpt_sovits_tts` | `TTSEngine` | GPT-SoVITS voice cloning |
+| `cosyvoice_tts` | `TTSEngine` | CosyVoice via Gradio |
+| `cosyvoice2_tts` | `TTSEngine` | CosyVoice 2 via Gradio |
+| `melo_tts` | `TTSEngine` | MeloTTS local |
+| `sherpa_onnx_tts` | `TTSEngine` | Sherpa-ONNX local |
+| `piper_tts` | `TTSEngine` | Piper TTS local |
+| `coqui_tts` | `TTSEngine` | Coqui TTS local |
+| `fish_api_tts` | `TTSEngine` | Fish Audio API |
+| `minimax_tts` | `TTSEngine` | MiniMax TTS API |
+| `siliconflow_tts` | `SiliconFlowTTS` | SiliconFlow API |
+| `spark_tts` | `TTSEngine` | SparkTTS via Gradio |
+| `bark_tts` | `TTSEngine` | Bark local |
+| `pyttsx3_tts` | `TTSEngine` | System TTS (offline fallback) |
+| `x_tts` | `TTSEngine` | XTTS API |
+
+## Step-by-step: adding a new TTS engine
+
+<Steps>
+  <Step title="Create the implementation file">
+    Create a new file in `src/open_llm_vtuber/tts/`. Name the class `TTSEngine` to match the existing convention.
+
+    ```python my_tts.py
+    import os
+    from loguru import logger
+    from .tts_interface import TTSInterface
+
+
+    class TTSEngine(TTSInterface):
+        def __init__(self, api_key: str, voice_id: str = "default"):
+            self.api_key = api_key
+            self.voice_id = voice_id
+            self.file_extension = "wav"
+
+        def generate_audio(self, text: str, file_name_no_ext=None) -> str:
+            file_path = self.generate_cache_file_name(
+                file_name_no_ext, self.file_extension
+            )
+
+            try:
+                audio_bytes = my_api_call(text, self.voice_id, self.api_key)
+                with open(file_path, "wb") as f:
+                    f.write(audio_bytes)
+            except Exception as e:
+                logger.error(f"TTS generation failed: {e}")
+                return None
+
+            return file_path
+    ```
+
+    If your provider supports streaming synthesis, override `async_generate_audio` directly instead of implementing `generate_audio`.
+  </Step>
+
+  <Step title="Register in TTSFactory">
+    Open `src/open_llm_vtuber/tts/tts_factory.py` and add a new branch:
+
+    ```python tts_factory.py
+    class TTSFactory:
+        @staticmethod
+        def get_tts_engine(engine_type, **kwargs) -> Type[TTSInterface]:
+            # ... existing branches ...
+
+            elif engine_type == "my_tts":
+                from .my_tts import TTSEngine as MyTTSEngine
+
+                return MyTTSEngine(
+                    api_key=kwargs.get("api_key"),
+                    voice_id=kwargs.get("voice_id", "default"),
+                )
+
+            else:
+                raise ValueError(f"Unknown TTS engine type: {engine_type}")
+    ```
+  </Step>
+
+  <Step title="Add a configuration class">
+    Add a Pydantic model in `src/open_llm_vtuber/config_manager/` for your engine's parameters:
+
+    ```python config_manager/tts.py
+    class MyTTSConfig(BaseModel):
+        api_key: str = ""
+        voice_id: str = "default"
+    ```
+  </Step>
+
+  <Step title="Update the default configuration templates">
+    Add the new option to both YAML templates:
+
+    ```yaml conf.default.yaml
+    tts_config:
+      tts_model: my_tts
+      my_tts:
+        api_key: "your-api-key"
+        voice_id: "default"
+    ```
+  </Step>
+
+  <Step title="Test the integration">
+    Set `tts_model: my_tts` in `conf.yaml` and run:
+
+    ```bash
+    uv run run_server.py --verbose
+    ```
+
+    Trigger a conversation and verify audio files appear in the `cache/` directory.
+  </Step>
+</Steps>
+
+## Audio file format
+
+The frontend can play MP3 and WAV files. Use `generate_cache_file_name` with the appropriate `file_extension` (`"mp3"` or `"wav"`) to ensure the file lands in the `cache/` directory with a predictable name. The TTS manager streams the file path to the client immediately after generation.
+
+<Warning>
+Do not delete the audio file inside `generate_audio`. The pipeline calls `remove_file` on the TTS interface once playback is confirmed. Deleting the file prematurely will cause playback errors.
+</Warning>

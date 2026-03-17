@@ -1,0 +1,171 @@
+---
+title: 'Ollama'
+description: 'Run local LLMs with Ollama as the backend. Configure model selection, memory management, and connection settings.'
+---
+
+[Ollama](https://ollama.com) is the default LLM backend for Open LLM VTuber. It runs models locally on your machine and exposes an OpenAI-compatible API. The integration preloads models on startup and handles unloading on exit.
+
+## Setup
+
+<Steps>
+  <Step title="Install Ollama">
+    Download and install Ollama from [ollama.com](https://ollama.com). The installer sets up the Ollama service to run in the background.
+  </Step>
+
+  <Step title="Pull a model">
+    ```bash
+    ollama pull qwen2.5:latest
+    ```
+
+    Run `ollama list` to confirm the model downloaded successfully. You can substitute any model name supported by Ollama.
+  </Step>
+
+  <Step title="Verify Ollama is running">
+    ```bash
+    ollama list
+    ```
+
+    Ollama must be running before you start the Open LLM VTuber server. If it is not running, the server will log a connection error and the AI will repeat an error message until the connection is restored.
+  </Step>
+
+  <Step title="Configure conf.yaml">
+    Set `llm_provider` to `ollama_llm` and fill in the `ollama_llm` block under `llm_configs`:
+
+    ```yaml
+    character_config:
+      agent_config:
+        agent_settings:
+          basic_memory_agent:
+            llm_provider: 'ollama_llm'
+
+        llm_configs:
+          ollama_llm:
+            base_url: 'http://localhost:11434/v1'
+            model: 'qwen2.5:latest'
+            temperature: 1.0
+            keep_alive: -1
+            unload_at_exit: true
+    ```
+  </Step>
+</Steps>
+
+## Configuration reference
+
+```yaml
+llm_configs:
+  ollama_llm:
+    base_url: 'http://localhost:11434/v1'
+    model: 'qwen2.5:latest'
+    temperature: 1.0
+    keep_alive: -1
+    unload_at_exit: true
+```
+
+<ParamField path="base_url" type="string" required>
+  The URL of the Ollama OpenAI-compatible API endpoint. The default Ollama installation listens on port `11434`. The `/v1` suffix is required.
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The name of the Ollama model to use. Must match the model name shown by `ollama list`. Examples: `qwen2.5:latest`, `llama3.2:3b`, `mistral:latest`.
+</ParamField>
+
+<ParamField path="temperature" type="number" default="1.0">
+  Sampling temperature between `0` and `2`. Higher values produce more varied and creative output. Lower values produce more predictable, focused responses. For VTuber conversation, values between `0.7` and `1.2` tend to work well.
+</ParamField>
+
+<ParamField path="keep_alive" type="number" default="-1">
+  How long (in seconds) Ollama keeps the model loaded in memory after the last request.
+
+  - `-1` — Keep the model loaded indefinitely (even after Open LLM VTuber exits). Eliminates reload delay between sessions.
+  - `0` — Unload immediately after each request.
+  - Positive integer — Unload after that many seconds of inactivity.
+
+  Setting `keep_alive: -1` is recommended for interactive use to eliminate the model loading delay at the start of each session.
+</ParamField>
+
+<ParamField path="unload_at_exit" type="boolean" default="true">
+  When `true`, Open LLM VTuber sends an unload request to Ollama when the server shuts down (sets `keep_alive` to `0`). This frees VRAM immediately. Set to `false` if you want the model to remain loaded after the server stops.
+</ParamField>
+
+## Model loading behavior
+
+The Ollama integration preloads the configured model on server startup using the `keep_alive` value. You will see a log message: `Preloading model for Ollama`. The first response after a cold start may be slightly slower while the model loads into memory.
+
+On server shutdown (or when the Python garbage collector finalizes the LLM object), if `unload_at_exit` is `true`, the model is unloaded by sending a request with `keep_alive: 0`.
+
+## Recommended models
+
+The following models work well for VTuber use cases:
+
+<AccordionGroup>
+  <Accordion title="Qwen 2.5 (recommended default)">
+    ```bash
+    ollama pull qwen2.5:latest      # ~4.7 GB, good balance of quality and speed
+    ollama pull qwen2.5:7b          # Explicit 7B variant
+    ollama pull qwen2.5:3b          # Smaller, faster, lower VRAM
+    ```
+
+    Qwen 2.5 follows persona prompts well and produces natural conversational text. It is the default model in `conf.default.yaml`.
+  </Accordion>
+
+  <Accordion title="Llama 3.2">
+    ```bash
+    ollama pull llama3.2:latest     # ~2.0 GB, 3B parameter model
+    ollama pull llama3.2:1b         # Very small, fast on CPU
+    ```
+
+    Good for low-resource setups. The 3B model runs well on CPU without a GPU.
+  </Accordion>
+
+  <Accordion title="Mistral">
+    ```bash
+    ollama pull mistral:latest      # ~4.1 GB
+    ```
+
+    Strong instruction following, suitable for characters with complex persona prompts.
+  </Accordion>
+
+  <Accordion title="Gemma 3">
+    ```bash
+    ollama pull gemma3:4b
+    ollama pull gemma3:12b
+    ```
+
+    Google's Gemma 3 series performs well on conversational tasks with efficient VRAM usage.
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+Use `ollama list` to see all locally available models. Use `ollama ps` to check which models are currently loaded in memory.
+</Tip>
+
+## Connecting to Ollama on a different machine
+
+If Ollama runs on a different machine (or a Docker container), change `base_url` to point to that machine:
+
+```yaml
+ollama_llm:
+  base_url: 'http://192.168.1.100:11434/v1'
+  model: 'qwen2.5:latest'
+  temperature: 1.0
+  keep_alive: -1
+  unload_at_exit: true
+```
+
+Make sure the remote Ollama instance is configured to accept external connections (set `OLLAMA_HOST=0.0.0.0` on the Ollama machine).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Server logs show 'Fail to connect to Ollama backend'">
+    Ollama is not running or not reachable at the configured `base_url`. Start Ollama (`ollama serve` or open the Ollama app), then restart the Open LLM VTuber server.
+  </Accordion>
+
+  <Accordion title="AI says 'Error calling the chat endpoint'">
+    The model name in `conf.yaml` does not match any locally available model. Run `ollama list` to see available models and update the `model` field.
+  </Accordion>
+
+  <Accordion title="Slow first response">
+    The model is loading from disk. Set `keep_alive: -1` to keep it in memory between sessions, or wait for the initial load to complete.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,134 @@
+---
+title: 'Faster Whisper ASR'
+description: 'Configure faster-whisper, whisper.cpp, and the original OpenAI Whisper for offline speech recognition.'
+---
+
+`faster_whisper` is a high-accuracy offline ASR engine based on a reimplementation of OpenAI Whisper using CTranslate2. It supports CUDA acceleration and all standard Whisper model sizes.
+
+## Configuration
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'faster_whisper'
+
+    faster_whisper:
+      model_path: 'large-v3-turbo'   # Model name, local path, or Hugging Face ID
+      download_root: 'models/whisper'
+      language: 'en'                  # Language code, or leave blank for auto-detect
+      device: 'auto'                  # 'cpu', 'cuda', or 'auto'
+      compute_type: 'int8'            # 'int8', 'float16', or 'float32'
+      prompt: ''                      # Optional: initial context to guide transcription
+```
+
+## Parameter reference
+
+<ParamField path="model_path" type="string" default="large-v3-turbo">
+  Model to use. Accepts:
+  - A short model name: `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`
+  - A Hugging Face model ID: e.g., `Systran/faster-whisper-large-v3`
+  - A local path to an extracted model directory
+
+  Models are downloaded from Hugging Face on first use and cached in `download_root`.
+</ParamField>
+
+<ParamField path="download_root" type="string" default="models/whisper">
+  Directory where downloaded models are cached.
+</ParamField>
+
+<ParamField path="language" type="string">
+  Language code for transcription (e.g., `en`, `zh`, `ja`). Leave blank or omit for automatic language detection. Auto-detect adds slight latency.
+</ParamField>
+
+<ParamField path="device" type="string" default="auto">
+  Compute device.
+  - `auto` — Uses CUDA if available, otherwise CPU.
+  - `cpu` — Force CPU inference.
+  - `cuda` — Force CUDA (requires a compatible NVIDIA GPU and CUDA drivers).
+
+  <Warning>
+  faster-whisper does not support Apple Silicon MPS. Use `cpu` or `auto` on macOS.
+  </Warning>
+</ParamField>
+
+<ParamField path="compute_type" type="string" default="int8">
+  Quantization level. Controls the trade-off between speed and accuracy:
+  - `int8` — Fastest, lowest memory use. Recommended for CPU.
+  - `float16` — Half precision. Recommended for CUDA. Requires a GPU with FP16 support.
+  - `float32` — Full precision. Slowest; use only when accuracy is critical.
+</ParamField>
+
+<ParamField path="prompt" type="string">
+  An initial prompt to provide context. For example, setting it to a character name or domain vocabulary can improve accuracy for specialized terms.
+</ParamField>
+
+## whisper_cpp alternative
+
+`whisper_cpp` uses `pywhispercpp`, a Python binding for the whisper.cpp C++ library. It is optimized for CPU inference.
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'whisper_cpp'
+
+    whisper_cpp:
+      model_name: 'small'
+      model_dir: 'models/whisper'
+      print_realtime: false
+      print_progress: false
+      language: 'auto'   # 'en', 'zh', or 'auto'
+      prompt: ''
+```
+
+<ParamField path="model_name" type="string" default="small">
+  Whisper model size. Available models are listed at `https://abdeladim-s.github.io/pywhispercpp/#pywhispercpp.constants.AVAILABLE_MODELS`.
+</ParamField>
+
+<ParamField path="model_dir" type="string" default="models/whisper">
+  Directory where model files are stored and downloaded.
+</ParamField>
+
+<ParamField path="language" type="string" default="auto">
+  Transcription language. `auto` enables automatic detection.
+</ParamField>
+
+## whisper (original OpenAI) alternative
+
+`whisper` uses the original `openai-whisper` Python library.
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'whisper'
+
+    whisper:
+      name: 'medium'
+      download_root: 'models/whisper'
+      device: 'cpu'
+      prompt: ''
+```
+
+<ParamField path="name" type="string" default="medium">
+  Model size. Options: `tiny`, `base`, `small`, `medium`, `large`, `large-v2`, `large-v3`.
+</ParamField>
+
+<ParamField path="device" type="string" default="cpu">
+  Compute device: `cpu` or `cuda`.
+</ParamField>
+
+<Note>
+The original `whisper` library is significantly slower than `faster_whisper` on CPU. Prefer `faster_whisper` or `whisper_cpp` for interactive use.
+</Note>
+
+## Choosing a model size
+
+| Model | Size | Speed | Accuracy |
+|---|---|---|---|
+| `tiny` | ~75 MB | Fastest | Lowest |
+| `base` | ~145 MB | Very fast | Low |
+| `small` | ~466 MB | Fast | Moderate |
+| `medium` | ~1.5 GB | Moderate | Good |
+| `large-v3` | ~3 GB | Slow | Best |
+| `large-v3-turbo` | ~1.5 GB | Fast | Near-large accuracy |
+
+For most interactive use, `large-v3-turbo` with `device: 'auto'` and `compute_type: 'int8'` offers a good balance of speed and accuracy.

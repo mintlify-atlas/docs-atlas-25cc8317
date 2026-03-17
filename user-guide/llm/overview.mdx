@@ -1,0 +1,177 @@
+---
+title: 'LLM backends overview'
+description: 'How LLM providers are configured in Open LLM VTuber — agent types, the llm_configs pool, and response behavior settings.'
+---
+
+Open LLM VTuber connects to LLM backends through a two-layer system: a conversation **agent** that manages memory and conversation flow, and a **stateless LLM** provider that makes the actual API calls.
+
+## Agent types
+
+The `conversation_agent_choice` setting in `agent_config` selects which agent manages the conversation.
+
+```yaml
+character_config:
+  agent_config:
+    conversation_agent_choice: 'basic_memory_agent'
+```
+
+<CardGroup cols={2}>
+  <Card title="basic_memory_agent" icon="brain">
+    The default agent. Maintains a rolling conversation history and calls any stateless LLM provider directly. Supports MCP tools. Recommended for most use cases.
+  </Card>
+  <Card title="letta_agent" icon="server">
+    Connects to an external [Letta](https://letta.com) server. The LLM runs inside Letta, which handles long-term memory. Requires a running Letta instance.
+  </Card>
+  <Card title="hume_ai_agent" icon="waveform">
+    Connects to [Hume AI EVI](https://hume.ai), a voice-native emotional intelligence API. The LLM and voice are both handled by Hume's cloud service.
+  </Card>
+  <Card title="mem0_agent" icon="database">
+    Uses [Mem0](https://mem0.ai) for persistent vector-based memory. Requires a configured vector store (e.g., Qdrant) and embedder.
+  </Card>
+</CardGroup>
+
+<Note>
+When `letta_agent` or `hume_ai_agent` is selected, the LLM provider runs externally. The `llm_configs` pool is not used by those agents.
+</Note>
+
+## llm_configs pool
+
+The `llm_configs` block under `agent_config` is a pool of LLM provider credentials and connection details. Any number of providers can be defined here simultaneously. The `llm_provider` setting in the agent's config selects which one is active.
+
+```yaml
+character_config:
+  agent_config:
+    agent_settings:
+      basic_memory_agent:
+        llm_provider: 'ollama_llm'   # Active provider
+
+    llm_configs:
+      ollama_llm:
+        base_url: 'http://localhost:11434/v1'
+        model: 'qwen2.5:latest'
+        temperature: 1.0
+        keep_alive: -1
+        unload_at_exit: true
+
+      openai_llm:
+        llm_api_key: 'sk-...'
+        model: 'gpt-4o'
+        temperature: 1.0
+```
+
+Switch providers by changing `llm_provider` to the name of any populated entry in `llm_configs`.
+
+## Supported LLM providers
+
+| Provider key | Type | Description |
+|---|---|---|
+| `ollama_llm` | Local | Ollama API |
+| `openai_compatible_llm` | Local/Cloud | Any OpenAI-compatible endpoint |
+| `lmstudio_llm` | Local | LM Studio |
+| `llama_cpp_llm` | Local | llama.cpp (GGUF files) |
+| `stateless_llm_with_template` | Local | OpenAI-compatible with chat template override |
+| `openai_llm` | Cloud | OpenAI official API |
+| `claude_llm` | Cloud | Anthropic Claude |
+| `gemini_llm` | Cloud | Google Gemini |
+| `deepseek_llm` | Cloud | DeepSeek |
+| `groq_llm` | Cloud | Groq |
+| `zhipu_llm` | Cloud | ZhiPu AI (GLM) |
+| `mistral_llm` | Cloud | Mistral AI |
+
+## basic_memory_agent settings
+
+The `basic_memory_agent` section under `agent_settings` controls response behavior:
+
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'ollama_llm'
+    faster_first_response: true
+    segment_method: 'pysbd'
+    use_mcpp: false
+    mcp_enabled_servers: []
+```
+
+<ParamField path="llm_provider" type="string" required>
+  Which provider from `llm_configs` to use. Must exactly match a key in the `llm_configs` block.
+</ParamField>
+
+<ParamField path="faster_first_response" type="boolean" default="true">
+  When `true`, the agent starts generating audio as soon as it encounters the first comma in the first sentence. This reduces perceived latency significantly. Disable if you notice the first sentence being cut short.
+</ParamField>
+
+<ParamField path="segment_method" type="string" default="pysbd">
+  Controls how the LLM's text output is split into segments for TTS synthesis.
+
+  - `pysbd` — Uses the `pysbd` library for linguistically-aware sentence boundary detection. Recommended.
+  - `regex` — Splits on punctuation using regular expressions. Faster but less accurate for complex sentences.
+</ParamField>
+
+<ParamField path="use_mcpp" type="boolean" default="false">
+  Enables MCP (Model Context Protocol) Plus, allowing the LLM to call external tools. Requires `mcp_prompt` to be set in `system_config.tool_prompts`.
+</ParamField>
+
+<ParamField path="mcp_enabled_servers" type="array">
+  List of MCP server names to enable. For example: `["time", "ddg-search"]`.
+</ParamField>
+
+## Letta agent settings
+
+```yaml
+agent_settings:
+  letta_agent:
+    host: 'localhost'
+    port: 8283
+    id: 'your-letta-agent-id'
+    faster_first_response: true
+    segment_method: 'pysbd'
+```
+
+<ParamField path="host" type="string" default="localhost">
+  Hostname of the Letta server.
+</ParamField>
+
+<ParamField path="port" type="integer" default="8283">
+  Port of the Letta server.
+</ParamField>
+
+<ParamField path="id" type="string" required>
+  The agent instance ID from the Letta server. Find it in the Letta web UI or via the Letta CLI.
+</ParamField>
+
+## Hume AI agent settings
+
+```yaml
+agent_settings:
+  hume_ai_agent:
+    api_key: 'your-hume-api-key'
+    host: 'api.hume.ai'
+    config_id: ''       # Optional EVI configuration ID
+    idle_timeout: 15
+```
+
+<ParamField path="api_key" type="string" required>
+  Your Hume AI API key.
+</ParamField>
+
+<ParamField path="config_id" type="string">
+  Optional. The EVI configuration ID from the Hume AI dashboard, if you have a custom EVI config.
+</ParamField>
+
+<ParamField path="idle_timeout" type="integer" default="15">
+  Seconds of inactivity before the Hume AI WebSocket connection is closed.
+</ParamField>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Ollama" icon="box" href="/user-guide/llm/ollama">
+    Run fully local LLMs with Ollama.
+  </Card>
+  <Card title="OpenAI-compatible" icon="plug" href="/user-guide/llm/openai-compatible">
+    LM Studio, vLLM, and any OpenAI-compatible endpoint.
+  </Card>
+  <Card title="Cloud providers" icon="cloud" href="/user-guide/llm/cloud-providers">
+    OpenAI, Claude, Gemini, DeepSeek, Groq, and more.
+  </Card>
+</CardGroup>

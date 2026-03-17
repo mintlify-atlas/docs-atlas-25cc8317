@@ -1,0 +1,79 @@
+---
+title: 'ASR overview'
+description: 'Automatic Speech Recognition options in Open LLM VTuber — how to select a backend and when to use each one.'
+---
+
+Open LLM VTuber supports several ASR (Automatic Speech Recognition) backends. The active backend is set by `asr_model` inside `character_config.asr_config`.
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'sherpa_onnx_asr'
+```
+
+Change `asr_model` to the key of any backend listed below, then add or update the matching config block.
+
+## Supported backends
+
+| Backend | Type | Languages | Notes |
+|---|---|---|---|
+| `sherpa_onnx_asr` | Offline | Multi (model-dependent) | Default. Fully offline, no setup required for SenseVoice. |
+| `faster_whisper` | Offline | 99+ | High accuracy; requires more VRAM than sherpa_onnx. |
+| `whisper_cpp` | Offline | 99+ | CPU-optimized Whisper port. |
+| `whisper` | Offline | 99+ | Original OpenAI Whisper. Slowest on CPU. |
+| `fun_asr` | Offline\* | zh, en, auto | Downloads model on first launch; can run offline after. |
+| `groq_whisper_asr` | Cloud | 99+ | Fast cloud transcription via Groq. |
+| `azure_asr` | Cloud | 100+ | Microsoft Azure Speech Service. Multi-language detection. |
+
+\* `fun_asr` requires an internet connection on every launch to check for model updates unless `disable_update: true` is set.
+
+## Comparison
+
+<CardGroup cols={2}>
+  <Card title="sherpa_onnx_asr" icon="microchip">
+    Best default offline choice. The SenseVoice model auto-downloads on first run and supports Chinese, English, Japanese, Korean, and Cantonese. Lightweight and fast on CPU.
+  </Card>
+  <Card title="groq_whisper_asr" icon="cloud">
+    Best cloud choice. Groq's inference is extremely fast with Whisper-large-v3-turbo. Requires a free Groq API key.
+  </Card>
+  <Card title="faster_whisper" icon="bolt">
+    Best offline accuracy for multilingual use cases. Supports CUDA acceleration and all Whisper model sizes.
+  </Card>
+  <Card title="azure_asr" icon="globe">
+    Strongest multilingual detection. Can detect multiple languages simultaneously. Requires an Azure subscription.
+  </Card>
+</CardGroup>
+
+## Recommendations
+
+- **Offline use**: Start with `sherpa_onnx_asr` (default). If you need higher accuracy on non-CJK languages, switch to `faster_whisper`.
+- **Cloud use**: Use `groq_whisper_asr` for low-latency transcription at no cost on the free tier. Use `azure_asr` if you need robust multi-language auto-detection.
+- **Chinese-focused**: `sherpa_onnx_asr` with `sense_voice` or `fun_asr` both work well for Mandarin.
+
+## Setting asr_model
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'sherpa_onnx_asr'  # Change this to switch backends
+
+    sherpa_onnx_asr:
+      model_type: 'sense_voice'
+      # ... other fields for this backend
+```
+
+Only the block matching the active `asr_model` value is loaded. Other blocks are ignored.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Sherpa-ONNX ASR" icon="microchip" href="/user-guide/asr/sherpa-onnx">
+    Configure the default offline ASR engine.
+  </Card>
+  <Card title="Faster Whisper" icon="bolt" href="/user-guide/asr/faster-whisper">
+    High-accuracy offline transcription with CUDA support.
+  </Card>
+  <Card title="Cloud ASR" icon="cloud" href="/user-guide/asr/cloud-asr">
+    Groq Whisper and Azure Speech Service.
+  </Card>
+</CardGroup>

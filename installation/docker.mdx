@@ -1,0 +1,119 @@
+---
+title: 'Docker'
+description: 'Run Open-LLM-VTuber in a Docker container with a mounted configuration directory.'
+---
+
+The official Docker image is available at [Docker Hub](https://hub.docker.com/r/open-llm-vtuber/open-llm-vtuber). It runs the server on port `12393` and expects your configuration to be mounted at `/app/conf`.
+
+## How the image works
+
+The Dockerfile builds from `python:3.10-slim` and installs all dependencies with `uv`. At startup, a shell script (`start-app`) handles configuration mounting before launching the server:
+
+| Mount path | Purpose |
+|---|---|
+| `/app/conf/conf.yaml` | **Required.** Main configuration file. |
+| `/app/conf/model_dict.json` | Optional. Custom Live2D model registry. |
+| `/app/conf/live2d-models/` | Optional. Custom Live2D model files. |
+| `/app/conf/characters/` | Optional. Character YAML files. |
+| `/app/conf/avatars/` | Optional. Character avatar images. |
+| `/app/conf/backgrounds/` | Optional. Background images. |
+| `/app/models/` | Persistent model cache (ASR/TTS model downloads). |
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) installed and running.
+- A `conf.yaml` file. Copy and edit the default from the repository:
+
+```bash
+git clone https://github.com/Open-LLM-VTuber/Open-LLM-VTuber.git
+cp Open-LLM-VTuber/config_templates/conf.default.yaml ./conf.yaml
+```
+
+Edit `conf.yaml` to configure your LLM backend, ASR, and TTS settings before starting the container.
+
+## Running the container
+
+Create a local directory structure for your configuration and models:
+
+```bash
+mkdir -p ./olv-config ./olv-models
+cp conf.yaml ./olv-config/conf.yaml
+```
+
+Start the container:
+
+```bash
+docker run -d \
+  --name open-llm-vtuber \
+  -p 12393:12393 \
+  -v "$(pwd)/olv-config:/app/conf" \
+  -v "$(pwd)/olv-models:/app/models" \
+  open-llm-vtuber/open-llm-vtuber:latest
+```
+
+Open `http://localhost:12393` in your browser.
+
+<Warning>
+`conf.yaml` is required. The container will exit with an error if `/app/conf/conf.yaml` is not present.
+</Warning>
+
+## Environment variables
+
+The following environment variables are set inside the image:
+
+| Variable | Value | Description |
+|---|---|---|
+| `PYTHONDONTWRITEBYTECODE` | `1` | Prevents `.pyc` files |
+| `PYTHONUNBUFFERED` | `1` | Forces stdout/stderr flushing |
+| `UV_LINK_MODE` | `copy` | uv dependency install mode |
+| `CONFIG_FILE` | `/app/conf/conf.yaml` | Config file path inside container |
+
+Models downloaded by the application (e.g., sherpa-onnx SenseVoice) are stored in `/app/models`, which maps to your mounted `olv-models/` directory.
+
+## Docker Compose example
+
+```yaml
+services:
+  open-llm-vtuber:
+    image: open-llm-vtuber/open-llm-vtuber:latest
+    ports:
+      - "12393:12393"
+    volumes:
+      - ./olv-config:/app/conf
+      - ./olv-models:/app/models
+    restart: unless-stopped
+```
+
+Save this as `docker-compose.yml` and run:
+
+```bash
+docker compose up -d
+```
+
+## Connecting to Ollama
+
+If you run Ollama on the host machine, the container needs to reach it. Use `host.docker.internal` instead of `localhost` in `conf.yaml`:
+
+```yaml
+character_config:
+  agent_config:
+    llm_configs:
+      ollama_llm:
+        base_url: 'http://host.docker.internal:11434/v1'
+        model: 'qwen2.5:latest'
+```
+
+On Linux, also pass `--add-host=host.docker.internal:host-gateway` to `docker run`, or add it under `extra_hosts` in your Compose file:
+
+```yaml
+services:
+  open-llm-vtuber:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+```
+
+## Viewing logs
+
+```bash
+docker logs -f open-llm-vtuber
+```

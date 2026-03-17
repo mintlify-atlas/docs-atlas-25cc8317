@@ -1,0 +1,132 @@
+---
+title: 'macOS'
+description: 'Install Open-LLM-VTuber on macOS, including Apple Silicon (arm64) and Intel (x86_64) support.'
+---
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install Homebrew">
+    [Homebrew](https://brew.sh) is the recommended package manager for macOS. Install it if you haven't already:
+
+    ```bash
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    ```
+  </Step>
+
+  <Step title="Install Git and ffmpeg">
+    ```bash
+    brew install git ffmpeg
+    ```
+  </Step>
+
+  <Step title="Install Python 3.10–3.12">
+    ```bash
+    brew install python@3.12
+    ```
+
+    <Warning>
+    Python 3.13 is not supported. Use Python 3.10, 3.11, or 3.12.
+    </Warning>
+
+    Verify:
+
+    ```bash
+    python3.12 --version
+    ```
+  </Step>
+
+  <Step title="Install uv">
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+    Restart your terminal, then verify:
+
+    ```bash
+    uv --version
+    ```
+  </Step>
+
+  <Step title="Install Ollama (default LLM backend)">
+    ```bash
+    brew install ollama
+    ```
+
+    Start the Ollama server and pull the default model:
+
+    ```bash
+    ollama serve &
+    ollama pull qwen2.5:latest
+    ```
+  </Step>
+</Steps>
+
+## Clone and install
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/Open-LLM-VTuber/Open-LLM-VTuber.git
+    cd Open-LLM-VTuber
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    uv sync
+    ```
+  </Step>
+
+  <Step title="Run the server">
+    ```bash
+    uv run run_server.py
+    ```
+
+    Open `http://localhost:12393` in your browser.
+  </Step>
+</Steps>
+
+## Apple Silicon vs Intel
+
+The project detects your architecture and installs the correct PyTorch build automatically via `pyproject.toml`:
+
+| Architecture | PyTorch version |
+|---|---|
+| Apple Silicon (arm64) | `>=2.6.0` |
+| Intel (x86_64) | `==2.2.2` |
+
+**Apple Silicon (MPS acceleration)**: PyTorch uses Metal Performance Shaders (MPS) for GPU-accelerated inference where supported. Components like MeloTTS can be configured to use MPS:
+
+```yaml
+character_config:
+  tts_config:
+    melo_tts:
+      device: 'mps'
+```
+
+For sherpa-onnx, use CoreML acceleration on Apple Silicon:
+
+```yaml
+character_config:
+  asr_config:
+    sherpa_onnx_asr:
+      provider: 'cpu'  # 'cpu' recommended; CoreML available for TTS models
+```
+
+```yaml
+character_config:
+  tts_config:
+    sherpa_onnx_tts:
+      provider: 'coreml'
+```
+
+**Intel Macs**: All components run on CPU. PyTorch 2.2.2 is pinned for compatibility with x86_64 macOS.
+
+## Verbose logging
+
+```bash
+uv run run_server.py --verbose
+```
+
+Logs are written to `logs/debug_<date>.log`.

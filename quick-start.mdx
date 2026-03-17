@@ -1,0 +1,112 @@
+---
+title: 'Quick start'
+description: 'Get Open-LLM-VTuber running in minutes with the default Ollama + sherpa-onnx ASR + Edge TTS configuration.'
+---
+
+## Prerequisites
+
+Before you begin, install the following tools:
+
+- **Python 3.10–3.12** — Python 3.13 is not supported.
+- **[uv](https://docs.astral.sh/uv/)** — The package manager used by this project.
+- **[ffmpeg](https://ffmpeg.org/)** — Required for audio processing.
+- **[Ollama](https://ollama.com/)** — The default LLM backend. Install and pull a model before starting.
+- **Git** — To clone the repository and initialize submodules.
+
+<Tip>
+The default configuration uses Ollama with `qwen2.5:latest`, sherpa-onnx for speech recognition, and Edge TTS for voice output. All components run locally — no cloud API keys required.
+</Tip>
+
+## Installation
+
+<Steps>
+  <Step title="Pull the default LLM model">
+    Start Ollama and pull the default model:
+
+    ```bash
+    ollama pull qwen2.5:latest
+    ```
+
+    You can use any Ollama-compatible model. Update `conf.yaml` later to change it.
+  </Step>
+
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/Open-LLM-VTuber/Open-LLM-VTuber.git
+    cd Open-LLM-VTuber
+    ```
+
+    The repository includes a `frontend/` Git submodule. The server will attempt to initialize it automatically on first run.
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    uv sync
+    ```
+
+    `uv` reads `pyproject.toml` and installs all required packages into an isolated virtual environment.
+  </Step>
+
+  <Step title="Start the server">
+    ```bash
+    uv run run_server.py
+    ```
+
+    On first launch, the server:
+    - Syncs your `conf.yaml` with the latest defaults
+    - Initializes the frontend submodule if missing
+    - Downloads the sherpa-onnx SenseVoice ASR model automatically
+    - Starts listening on `http://localhost:12393`
+
+    For detailed debug output, use:
+
+    ```bash
+    uv run run_server.py --verbose
+    ```
+  </Step>
+
+  <Step title="Open the web interface">
+    Navigate to `http://localhost:12393` in your browser. You should see the Live2D character and the chat interface.
+
+    <Note>
+    The microphone only works over `localhost` or `https`. If you access the server from another device on your network, you must configure HTTPS via a reverse proxy.
+    </Note>
+  </Step>
+</Steps>
+
+## Default configuration
+
+The server loads `conf.yaml` from the project root on startup. A copy is created from `config_templates/conf.default.yaml` on first run. The defaults are:
+
+| Component | Default |
+|---|---|
+| LLM | Ollama (`qwen2.5:latest`) |
+| ASR | sherpa-onnx SenseVoice |
+| TTS | Edge TTS (`en-US-AvaMultilingualNeural`) |
+| Host | `localhost` |
+| Port | `12393` |
+
+## Updating
+
+To update an existing installation:
+
+```bash
+uv run upgrade.py
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how the server, engines, and frontend fit together.
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/concepts/configuration">
+    Learn how conf.yaml controls every component.
+  </Card>
+  <Card title="Characters" icon="user" href="/concepts/characters">
+    Create custom personas with different voices and models.
+  </Card>
+  <Card title="Windows installation" icon="windows" href="/installation/windows">
+    Platform-specific setup instructions.
+  </Card>
+</CardGroup>

@@ -1,0 +1,154 @@
+---
+title: 'Architecture'
+description: 'How Open-LLM-VTuber components fit together: FastAPI server, service context, engine factories, and the frontend submodule.'
+---
+
+Open-LLM-VTuber is a Python application built on FastAPI. The server handles WebSocket connections from the browser-based frontend, routing messages through a modular engine system for LLM inference, speech recognition, and speech synthesis.
+
+## High-level overview
+
+```
+┌────────────────────────────────────────────────┐
+│                   Browser client               │
+│           (frontend/ Git submodule)            │
+└─────────────────────┬──────────────────────────┘
+                      │ WebSocket /client-ws
+┌─────────────────────▼──────────────────────────┐
+│              WebSocketServer (FastAPI)          │
+│  server.py                                     │
+│  ├── /client-ws   → WebSocketHandler           │
+│  ├── /proxy-ws    → ProxyHandler (optional)    │
+│  ├── /asr         → REST transcription         │
+│  ├── /tts-ws      → TTS WebSocket              │
+│  └── static mounts (frontend, live2d-models,   │
+│                      backgrounds, avatars,      │
+│                      cache, web-tool)           │
+└─────────────────────┬──────────────────────────┘
+                      │
+┌─────────────────────▼──────────────────────────┐
+│             ServiceContext (per session)        │
+│  service_context.py                            │
+│  ├── asr_engine   (ASRInterface)               │
+│  ├── tts_engine   (TTSInterface)               │
+│  ├── vad_engine   (VADInterface)               │
+│  ├── agent_engine (AgentInterface)             │
+│  ├── live2d_model (Live2dModel)                │
+│  └── mcp_client   (MCPClient, optional)        │
+└─────────────────────┬──────────────────────────┘
+                      │
+┌─────────────────────▼──────────────────────────┐
+│               Engine factory layer             │
+│  ASRFactory / TTSFactory / VADFactory /        │
+│  AgentFactory — select implementation from     │
+│  configuration and instantiate it              │
+└────────────────────────────────────────────────┘
+```
+
+## Core components
+
+### WebSocketServer (`server.py`)
+
+`WebSocketServer` creates and configures the FastAPI application. It:
+
+- Registers WebSocket routes via `init_client_ws_route()` and `init_proxy_route()`
+- Registers REST routes via `init_webtool_routes()` (includes `/asr` and `/tts-ws`)
+- Mounts static directories for the frontend, Live2D models, backgrounds, avatars, and the audio cache
+- Adds global CORS middleware
+- Initializes the default `ServiceContext` via `await server.initialize()`
+
+The server reads host and port from `system_config` in `conf.yaml` (defaults: `localhost:12393`).
+
+### ServiceContext (`service_context.py`)
+
+`ServiceContext` is the dependency injection container for a connected client session. Each WebSocket connection gets its own `ServiceContext` instance.
+
+It holds references to:
+
+| Field | Type | Description |
+|---|---|---|
+| `asr_engine` | `ASRInterface` | Speech recognition engine |
+| `tts_engine` | `TTSInterface` | Text-to-speech engine |
+| `vad_engine` | `VADInterface` | Voice activity detection |
+| `agent_engine` | `AgentInterface` | LLM agent (handles conversation) |
+| `live2d_model` | `Live2dModel` | Live2D model metadata and expression map |
+| `mcp_client` | `MCPClient` | MCP tool client (optional) |
+| `system_prompt` | `str` | Assembled system prompt (persona + tool prompts) |
+
+`ServiceContext.load_from_config(config)` initializes all engines from a `Config` object. `ServiceContext.handle_config_switch()` handles live character switching — it deep-merges the new character YAML over the base `conf.yaml` and reinitializes only the changed engines.
+
+### WebSocket handler (`websocket_handler.py`)
+
+`WebSocketHandler` sits between the WebSocket route and the `ServiceContext`. It:
+
+- Creates a new `ServiceContext` for each connection
+- Routes incoming WebSocket messages to the appropriate handler method (`_handle_*` pattern)
+- Manages client connections, group conversations, and conversation state
+- Handles audio data, conversation triggers, and Live2D expression updates
+
+### Agent system (`agent/`)
+
+The agent system uses a factory pattern. `AgentFactory.create_agent()` reads `conversation_agent_choice` from the config and instantiates the matching implementation:
+
+| Agent | Description |
+|---|---|
+| `basic_memory_agent` | Default agent with in-session memory |
+| `letta_agent` | Connects to an external Letta server |
+| `hume_ai_agent` | Connects to Hume AI EVI API |
+| `mem0` | Uses Mem0 for persistent memory |
+
+Each agent wraps a stateless LLM implementation from `agent/stateless_llm/`. Supported providers include Ollama, OpenAI, Claude, Gemini, DeepSeek, Groq, Mistral, ZhipuAI, LM Studio, and GGUF via llama.cpp.
+
+### ASR, TTS, and VAD engines
+
+All three engine types follow the same pattern:
+
+1. An interface class defines the contract (`asr_interface.py`, `tts_interface.py`, `vad_interface.py`).
+2. Concrete implementations live in the respective directory (`asr/`, `tts/`, `vad/`).
+3. A factory class (`ASRFactory`, `TTSFactory`, `VADFactory`) reads the config and instantiates the correct engine.
+
+Changing the engine only requires updating the model name in `conf.yaml` — no code changes.
+
+### Frontend (`frontend/`)
+
+The frontend is a Git submodule at `frontend/`. It is served as a static site mounted at `/` by the FastAPI application. The frontend communicates with the backend exclusively over WebSocket at `/client-ws`.
+
+If the submodule is missing, `run_server.py` automatically runs `git submodule update --init --recursive` on startup.
+
+### MCP integration (`mcpp/`)
+
+The Model Context Protocol (MCP) integration allows the LLM agent to call external tools. When `use_mcpp: true` is set in the agent config, `ServiceContext` initializes:
+
+- `ServerRegistry` — tracks available MCP servers
+- `ToolAdapter` — fetches tool definitions and generates the MCP system prompt
+- `ToolManager` — holds formatted tool definitions for OpenAI and Claude APIs
+- `MCPClient` — executes tool calls
+- `ToolExecutor` — routes tool execution requests
+
+## Data flow for a voice conversation
+
+1. The browser captures microphone audio and streams it over WebSocket to `/client-ws`.
+2. `WebSocketHandler` routes the audio to the `asr_engine`, which returns a transcript.
+3. The transcript is passed to `agent_engine`, which streams the LLM response.
+4. Sentences are segmented and queued to `tts_engine`, which generates audio files in `cache/`.
+5. Audio file paths are sent back over WebSocket to the frontend for playback.
+6. Live2D expression keywords in the LLM response trigger expression updates in the frontend.
+
+## Key file locations
+
+| Path | Description |
+|---|---|
+| `run_server.py` | Entry point |
+| `src/open_llm_vtuber/server.py` | FastAPI app setup |
+| `src/open_llm_vtuber/routes.py` | Route definitions |
+| `src/open_llm_vtuber/websocket_handler.py` | WebSocket message routing |
+| `src/open_llm_vtuber/service_context.py` | Dependency injection container |
+| `src/open_llm_vtuber/agent/` | LLM agent implementations |
+| `src/open_llm_vtuber/asr/` | ASR engine implementations |
+| `src/open_llm_vtuber/tts/` | TTS engine implementations |
+| `src/open_llm_vtuber/vad/` | VAD engine implementations |
+| `src/open_llm_vtuber/config_manager/` | Config parsing and validation |
+| `frontend/` | Web client (Git submodule) |
+| `live2d-models/` | Live2D model files |
+| `characters/` | Character YAML overrides |
+| `chat_history/` | Persisted conversation logs |
+| `cache/` | Generated audio files (temporary) |

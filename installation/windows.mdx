@@ -1,0 +1,130 @@
+---
+title: 'Windows'
+description: 'Install Open-LLM-VTuber on Windows with CPU or NVIDIA GPU support.'
+---
+
+## Prerequisites
+
+Install the following before proceeding:
+
+<Steps>
+  <Step title="Install Git">
+    Download and install [Git for Windows](https://git-scm.com/download/win). Accept the default options during setup.
+  </Step>
+
+  <Step title="Install Python 3.10–3.12">
+    Download a supported Python version from [python.org](https://www.python.org/downloads/). During installation, check **Add Python to PATH**.
+
+    <Warning>
+    Python 3.13 is not supported. Use Python 3.10, 3.11, or 3.12.
+    </Warning>
+
+    Verify the installation:
+
+    ```powershell
+    python --version
+    ```
+  </Step>
+
+  <Step title="Install uv">
+    Open PowerShell and run:
+
+    ```powershell
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    ```
+
+    Restart your terminal after installation, then verify:
+
+    ```powershell
+    uv --version
+    ```
+  </Step>
+
+  <Step title="Install ffmpeg">
+    The easiest way is via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+
+    ```powershell
+    winget install ffmpeg
+    ```
+
+    Or download a build from [ffmpeg.org](https://ffmpeg.org/download.html) and add it to your `PATH` manually.
+
+    Verify:
+
+    ```powershell
+    ffmpeg -version
+    ```
+  </Step>
+
+  <Step title="Install Ollama (default LLM backend)">
+    Download and install [Ollama for Windows](https://ollama.com/download/windows), then pull the default model:
+
+    ```powershell
+    ollama pull qwen2.5:latest
+    ```
+  </Step>
+</Steps>
+
+## Clone and install
+
+<Steps>
+  <Step title="Clone the repository">
+    ```powershell
+    git clone https://github.com/Open-LLM-VTuber/Open-LLM-VTuber.git
+    cd Open-LLM-VTuber
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```powershell
+    uv sync
+    ```
+
+    This creates an isolated virtual environment and installs all packages from `pyproject.toml`. The process may take a few minutes on the first run.
+  </Step>
+
+  <Step title="Run the server">
+    ```powershell
+    uv run run_server.py
+    ```
+
+    The server starts at `http://localhost:12393`. Open this URL in your browser.
+  </Step>
+</Steps>
+
+## GPU acceleration
+
+**NVIDIA GPU**: PyTorch is installed by default with CUDA support when available. No extra steps are required for most ASR and TTS engines to use the GPU.
+
+For CUDA-accelerated sherpa-onnx inference, set the provider in `conf.yaml`:
+
+```yaml
+character_config:
+  asr_config:
+    sherpa_onnx_asr:
+      provider: 'cuda'
+```
+
+**CUDA via pixi** (for full CUDA toolkit and cuDNN): The `pyproject.toml` defines pixi dependencies targeting `win-64` with `cudatoolkit >=11.0,<12` and `cudnn >=8.0,<9`. Install [pixi](https://pixi.sh) and run `pixi install` if you need the full CUDA stack.
+
+**CPU-only**: The default configuration runs entirely on CPU. No GPU is required.
+
+## Verbose logging
+
+To debug issues, run with verbose output:
+
+```powershell
+uv run run_server.py --verbose
+```
+
+Logs are also written to `logs/debug_<date>.log`.
+
+## Remote access
+
+To access the server from another device, change `host` in `conf.yaml` to `0.0.0.0` and configure HTTPS via a reverse proxy. The browser microphone API requires a secure context (HTTPS or localhost).
+
+```yaml
+system_config:
+  host: '0.0.0.0'
+  port: 12393
+```

@@ -1,0 +1,211 @@
+---
+title: 'OpenAI-compatible endpoints'
+description: 'Connect Open LLM VTuber to any OpenAI-compatible API: LM Studio, vLLM, llama.cpp server, Ollama OpenAI endpoint, and more.'
+---
+
+Many local inference tools expose an OpenAI-compatible REST API. Open LLM VTuber provides three provider keys that target these endpoints: `openai_compatible_llm`, `lmstudio_llm`, and `stateless_llm_with_template`.
+
+## openai_compatible_llm
+
+The general-purpose OpenAI-compatible provider. Works with any server that implements the OpenAI chat completions API, including Ollama's OpenAI endpoint, vLLM, llama.cpp server, LocalAI, OpenWebUI, and others.
+
+### Configuration
+
+```yaml
+llm_configs:
+  openai_compatible_llm:
+    base_url: 'http://localhost:11434/v1'
+    llm_api_key: 'somethingelse'
+    organization_id: null
+    project_id: null
+    model: 'qwen2.5:latest'
+    temperature: 1.0
+    interrupt_method: 'user'
+```
+
+### Fields
+
+<ParamField path="base_url" type="string" required>
+  The base URL of the OpenAI-compatible API endpoint. Include the `/v1` path. Examples:
+  - Ollama: `http://localhost:11434/v1`
+  - vLLM: `http://localhost:8000/v1`
+  - llama.cpp server: `http://localhost:8080/v1`
+  - LocalAI: `http://localhost:8080/v1`
+</ParamField>
+
+<ParamField path="llm_api_key" type="string" required>
+  API key for authentication. For local servers that do not require a key, use any non-empty placeholder string such as `"none"` or `"local"`.
+</ParamField>
+
+<ParamField path="organization_id" type="string">
+  Optional organization ID, used by some OpenAI-compatible services. Set to `null` if not needed.
+</ParamField>
+
+<ParamField path="project_id" type="string">
+  Optional project ID. Set to `null` if not needed.
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  The model name as expected by the server. For Ollama: `qwen2.5:latest`. For vLLM, this is the model path or HuggingFace model ID.
+</ParamField>
+
+<ParamField path="temperature" type="number" default="1.0">
+  Sampling temperature between `0` and `2`.
+</ParamField>
+
+<ParamField path="interrupt_method" type="string" default="user">
+  How the interruption signal is injected into the conversation when the user speaks over the AI.
+
+  - `user` — Injects the signal as a user message. Use this if the provider does not support mid-stream system messages.
+  - `system` — Injects the signal as a system message. Produces cleaner conversation history on servers that support it.
+
+  You do not usually need to change this setting from the default.
+</ParamField>
+
+### Enable as active provider
+
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'openai_compatible_llm'
+```
+
+## lmstudio_llm
+
+A pre-configured variant for [LM Studio](https://lmstudio.ai). LM Studio's local server runs on port `1234` by default and supports system-prompt interruption.
+
+### Configuration
+
+```yaml
+llm_configs:
+  lmstudio_llm:
+    base_url: 'http://localhost:1234/v1'
+    model: 'qwen2.5:latest'
+    temperature: 1.0
+```
+
+`lmstudio_llm` uses `interrupt_method: system` by default and sets a sensible `base_url`. You only need to specify the model name.
+
+<Steps>
+  <Step title="Start the LM Studio local server">
+    Open LM Studio, load a model, and enable the **Local Server** from the left sidebar. The server starts on `http://localhost:1234`.
+  </Step>
+  <Step title="Set the model name">
+    Copy the model identifier shown in LM Studio's server panel. Paste it as the `model` value in `lmstudio_llm`.
+  </Step>
+  <Step title="Enable in conf.yaml">
+    ```yaml
+    agent_settings:
+      basic_memory_agent:
+        llm_provider: 'lmstudio_llm'
+    ```
+  </Step>
+</Steps>
+
+## stateless_llm_with_template
+
+Use this provider when the inference server requires an explicit chat template rather than the standard ChatML format used by most modern models. This is uncommon — most servers handle template application internally.
+
+### Configuration
+
+```yaml
+llm_configs:
+  stateless_llm_with_template:
+    base_url: 'http://localhost:8080/v1'
+    llm_api_key: 'somethingelse'
+    organization_id: null
+    project_id: null
+    model: 'qwen2.5:latest'
+    template: 'CHATML'
+    temperature: 1.0
+    interrupt_method: 'user'
+```
+
+<ParamField path="template" type="string">
+  The chat template format to apply. Use `CHATML` for models that use the ChatML format. Check the model's documentation for the correct template.
+</ParamField>
+
+All other fields are identical to `openai_compatible_llm`.
+
+## Examples by backend
+
+<Tabs>
+  <Tab title="Ollama (OpenAI endpoint)">
+    Ollama exposes an OpenAI-compatible endpoint at `/v1`. You can use either `ollama_llm` (recommended, with preload/unload) or `openai_compatible_llm`:
+
+    ```yaml
+    llm_configs:
+      openai_compatible_llm:
+        base_url: 'http://localhost:11434/v1'
+        llm_api_key: 'ollama'
+        model: 'qwen2.5:latest'
+        temperature: 1.0
+        interrupt_method: 'user'
+    ```
+  </Tab>
+
+  <Tab title="vLLM">
+    ```yaml
+    llm_configs:
+      openai_compatible_llm:
+        base_url: 'http://localhost:8000/v1'
+        llm_api_key: 'token-abc123'
+        model: 'Qwen/Qwen2.5-7B-Instruct'
+        temperature: 1.0
+        interrupt_method: 'user'
+    ```
+  </Tab>
+
+  <Tab title="LM Studio">
+    ```yaml
+    llm_configs:
+      lmstudio_llm:
+        base_url: 'http://localhost:1234/v1'
+        model: 'qwen2.5-7b-instruct'
+        temperature: 1.0
+    ```
+  </Tab>
+
+  <Tab title="llama.cpp server">
+    ```yaml
+    llm_configs:
+      openai_compatible_llm:
+        base_url: 'http://localhost:8080/v1'
+        llm_api_key: 'none'
+        model: 'qwen2.5'
+        temperature: 1.0
+        interrupt_method: 'user'
+    ```
+  </Tab>
+</Tabs>
+
+## llama_cpp_llm (in-process)
+
+For running a GGUF model directly inside the Python process without a separate server, use `llama_cpp_llm`:
+
+```yaml
+llm_configs:
+  llama_cpp_llm:
+    model_path: '/path/to/your-model.gguf'
+    verbose: false
+```
+
+<ParamField path="model_path" type="string" required>
+  Absolute or relative path to the `.gguf` model file.
+</ParamField>
+
+<ParamField path="verbose" type="boolean" default="false">
+  Set to `true` to enable verbose logging from llama.cpp.
+</ParamField>
+
+Enable it with:
+
+```yaml
+agent_settings:
+  basic_memory_agent:
+    llm_provider: 'llama_cpp_llm'
+```
+
+<Note>
+Using `llama_cpp_llm` requires the `llama-cpp-python` package. Install it separately as it is not included in the default dependencies: `uv pip install llama-cpp-python`.
+</Note>

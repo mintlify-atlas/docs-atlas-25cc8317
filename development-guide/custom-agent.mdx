@@ -1,0 +1,228 @@
+---
+title: Adding a custom agent
+description: How to implement a custom conversation agent by subclassing AgentInterface and registering it in AgentFactory.
+---
+
+Agents are the "thinking" layer of the system. An agent receives user input (text, audio, or images), calls one or more LLMs, manages conversation memory, and yields a stream of outputs that the pipeline converts to TTS audio and Live2D expressions.
+
+## The `AgentInterface`
+
+Defined at `src/open_llm_vtuber/agent/agents/agent_interface.py`:
+
+```python agent_interface.py
+from abc import ABC, abstractmethod
+from typing import AsyncIterator
+from ..output_types import BaseOutput
+from ..input_types import BaseInput
+
+
+class AgentInterface(ABC):
+    """Base interface for all agent implementations"""
+
+    @abstractmethod
+    async def chat(self, input_data: BaseInput) -> AsyncIterator[BaseOutput]:
+        """
+        Chat with the agent asynchronously.
+
+        Args:
+            input_data: BaseInput — user input data
+
+        Returns:
+            AsyncIterator[BaseOutput] — stream of agent outputs
+        """
+        raise ValueError("Agent: No chat function set.")
+
+    @abstractmethod
+    def handle_interrupt(self, heard_response: str) -> None:
+        """
+        Handle user interruption.
+        Called when the user speaks while the AI is still responding.
+
+        Args:
+            heard_response: The part of the response spoken before interruption.
+        """
+        pass
+
+    @abstractmethod
+    def set_memory_from_history(self, conf_uid: str, history_uid: str) -> None:
+        """
+        Load the agent's working memory from a stored chat history.
+
+        Args:
+            conf_uid: Configuration ID.
+            history_uid: History ID.
+        """
+        pass
+```
+
+All three methods are **required**.
+
+## Output types
+
+The `chat` method is an async generator that yields `BaseOutput` subclasses:
+
+| Class | When to use |
+|---|---|
+| `SentenceOutput` | Text-based agents that produce text → TTS audio |
+| `AudioOutput` | Agents that produce audio directly (e.g., Hume AI) |
+
+```python output_types.py (excerpt)
+@dataclass
+class SentenceOutput(BaseOutput):
+    display_text: DisplayText  # Text shown in the UI
+    tts_text: str              # Text sent to the TTS engine
+    actions: Actions           # Live2D expressions, sounds, pictures
+
+@dataclass
+class AudioOutput(BaseOutput):
+    audio_path: str            # Path to the audio file on disk
+    display_text: DisplayText  # Text shown in the UI
+    transcript: str            # Transcript of the audio
+    actions: Actions
+```
+
+`DisplayText` holds `text`, `name` (speaker name), and `avatar` (path to avatar image). `Actions` holds lists of `expressions`, `pictures`, and `sounds` that trigger Live2D animations.
+
+## Existing agents
+
+| Agent key | Class | Notes |
+|---|---|---|
+| `basic_memory_agent` | `BasicMemoryAgent` | Default — wraps any `StatelessLLM` with in-process memory |
+| `mem0_agent` | `Mem0LLM` | Long-term memory via the Mem0 service |
+| `hume_ai_agent` | `HumeAIAgent` | Emotional voice AI from Hume; produces `AudioOutput` |
+| `letta_agent` | `LettaAgent` | Persistent memory via the Letta framework |
+
+## How agents connect to `ServiceContext`
+
+Each WebSocket session owns a `ServiceContext` that holds the active agent in `context.agent_engine`. When the conversation pipeline receives a user utterance it calls:
+
+```python
+async for output in context.agent_engine.chat(input_data):
+    # output is SentenceOutput or AudioOutput
+    # → forwarded to TTS manager → audio streamed to client
+    # → actions extracted → sent as Live2D WebSocket messages
+```
+
+The `AgentFactory` constructs the agent during `ServiceContext.init_agent()`, which is called at startup and whenever the user switches character configurations.
+
+## Step-by-step: adding a custom agent
+
+<Steps>
+  <Step title="Create the agent file">
+    Create a new file in `src/open_llm_vtuber/agent/agents/`.
+
+    ```python my_agent.py
+    from typing import AsyncIterator
+    from loguru import logger
+    from .agent_interface import AgentInterface
+    from ..input_types import BaseInput
+    from ..output_types import BaseOutput, SentenceOutput, DisplayText, Actions
+
+
+    class MyAgent(AgentInterface):
+        def __init__(self, system: str, model: str, api_key: str):
+            self.system = system
+            self.model = model
+            self.api_key = api_key
+            self.memory = []  # Simple in-process memory
+
+        async def chat(self, input_data: BaseInput) -> AsyncIterator[BaseOutput]:
+            # Build the message list from memory + new input
+            messages = self.memory + [{"role": "user", "content": input_data.text}]
+
+            # Call your LLM and stream back sentences
+            async for sentence in my_llm_stream(messages, self.system):
+                yield SentenceOutput(
+                    display_text=DisplayText(text=sentence, name="AI"),
+                    tts_text=sentence,
+                    actions=Actions(),
+                )
+
+            # Save the turn to memory
+            self.memory.append({"role": "user", "content": input_data.text})
+            self.memory.append({"role": "assistant", "content": "..."})
+
+        def handle_interrupt(self, heard_response: str) -> None:
+            # Optionally record the interruption in memory
+            if heard_response:
+                self.memory.append(
+                    {"role": "assistant", "content": heard_response + " [interrupted]"}
+                )
+
+        def set_memory_from_history(self, conf_uid: str, history_uid: str) -> None:
+            # Load history from disk and populate self.memory
+            from ...chat_history_manager import get_history
+            self.memory = [
+                msg for msg in get_history(conf_uid, history_uid)
+                if msg["role"] != "system"
+            ]
+    ```
+  </Step>
+
+  <Step title="Register in AgentFactory">
+    Open `src/open_llm_vtuber/agent/agent_factory.py` and add a new branch:
+
+    ```python agent_factory.py
+    class AgentFactory:
+        @staticmethod
+        def create_agent(
+            conversation_agent_choice: str,
+            agent_settings: dict,
+            llm_configs: dict,
+            system_prompt: str,
+            live2d_model=None,
+            tts_preprocessor_config=None,
+            **kwargs,
+        ) -> Type[AgentInterface]:
+            # ... existing branches ...
+
+            elif conversation_agent_choice == "my_agent":
+                from .agents.my_agent import MyAgent
+
+                settings = agent_settings.get("my_agent", {})
+                return MyAgent(
+                    system=system_prompt,
+                    model=settings.get("model"),
+                    api_key=settings.get("api_key"),
+                )
+
+            else:
+                raise ValueError(f"Unsupported agent type: {conversation_agent_choice}")
+    ```
+  </Step>
+
+  <Step title="Add configuration">
+    Add a Pydantic config model for your agent's settings and update the default YAML templates:
+
+    ```yaml conf.default.yaml
+    agent_config:
+      conversation_agent_choice: my_agent
+      agent_settings:
+        my_agent:
+          model: "my-model"
+          api_key: "your-api-key"
+    ```
+  </Step>
+
+  <Step title="Test the agent">
+    Set `conversation_agent_choice: my_agent` in `conf.yaml` and run:
+
+    ```bash
+    uv run run_server.py --verbose
+    ```
+
+    Open the web interface and start a conversation. Watch the logs for `Initializing agent: my_agent`.
+  </Step>
+</Steps>
+
+## Live2D expression integration
+
+To trigger Live2D expressions from your agent, populate the `actions.expressions` list on `SentenceOutput` or `AudioOutput`. Expression names must match the keys defined in the Live2D model's expression map. The `BasicMemoryAgent` uses the `live2d_model.emo_str` to inject available expressions into the system prompt so the LLM can choose them.
+
+```python
+yield SentenceOutput(
+    display_text=DisplayText(text="Hello!", name="AI"),
+    tts_text="Hello!",
+    actions=Actions(expressions=["happy"]),
+)
+```

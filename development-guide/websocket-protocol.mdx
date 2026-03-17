@@ -1,0 +1,139 @@
+---
+title: WebSocket protocol
+description: How clients connect to Open LLM VTuber, the connection lifecycle, and the two WebSocket endpoints.
+---
+
+Open LLM VTuber exposes two WebSocket endpoints. The main endpoint, `/client-ws`, handles all real interaction. The `/proxy-ws` endpoint is for reverse-proxy scenarios where the frontend connects to a relay server instead of directly to the backend.
+
+## Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `ws://host:port/client-ws` | Direct client connection (browser, desktop app) |
+| `ws://host:port/proxy-ws` | Proxy relay — forwards messages to the real server |
+
+Both endpoints are registered in `src/open_llm_vtuber/routes.py`.
+
+<Note>
+There is no authentication on the WebSocket endpoints. Access control is managed at the network level — bind the server to `127.0.0.1` or use a reverse proxy with authentication if you need to restrict access.
+</Note>
+
+## Message format
+
+All messages are JSON objects. Every message has a `type` field that identifies the message kind:
+
+```json
+{"type": "message-type", ...payload fields}
+```
+
+See [Message types](/development-guide/message-types) for the full reference.
+
+## Connection lifecycle — `/client-ws`
+
+<Steps>
+  <Step title="Client opens WebSocket">
+    The client opens a WebSocket connection to `ws://localhost:12393/client-ws`.
+
+    The server accepts the connection and generates a UUID (`client_uid`) for this session.
+  </Step>
+
+  <Step title="Server initialises the session">
+    The server clones the default `ServiceContext` (which holds the ASR, TTS, agent, and VAD engines) for this client and stores the WebSocket handle.
+  </Step>
+
+  <Step title="Server sends initial messages">
+    The server immediately sends three messages to the client:
+
+    ```json
+    {"type": "full-text", "text": "Connection established"}
+    ```
+
+    ```json
+    {
+      "type": "set-model-and-conf",
+      "model_info": { ... },
+      "conf_name": "default",
+      "conf_uid": "abc123",
+      "client_uid": "uuid-of-this-session"
+    }
+    ```
+
+    ```json
+    {"type": "group-update", "members": [], "is_owner": false}
+    ```
+
+    ```json
+    {"type": "control", "text": "start-mic"}
+    ```
+
+    The `start-mic` control message tells the frontend to begin capturing microphone audio.
+  </Step>
+
+  <Step title="Ongoing message exchange">
+    After setup, the client and server exchange messages in both directions. The client sends audio data, text input, and control commands; the server sends back transcriptions, AI responses, audio file paths, and Live2D expression commands.
+
+    Every message the server receives is dispatched to a handler via the `_init_message_handlers()` dictionary in `WebSocketHandler`.
+  </Step>
+
+  <Step title="Client disconnects">
+    When the WebSocket closes, the server:
+    1. Cancels any in-progress conversation task.
+    2. Removes the client from any chat group.
+    3. Calls `context.close()` to release resources (MCP clients, etc.).
+    4. Deletes all per-session data.
+  </Step>
+</Steps>
+
+## Audio flow
+
+The typical voice conversation flow over WebSocket:
+
+```
+Client                              Server
+  |                                    |
+  |-- mic-audio-data (chunks) -------> |
+  |-- mic-audio-end -----------------> | trigger ASR + agent
+  |                                    |
+  | <-- full-text (transcription) -----|
+  | <-- full-text (AI response) -------|
+  | <-- audio-play-request (path) -----|
+  | <-- backend-synth-done ------------|
+  |                                    |
+  |-- audio-play-start (with text) --> | sync display for group members
+  |                                    |
+  | <-- control: start-mic ------------|
+```
+
+For VAD (voice activity detection) mode, the client sends `raw-audio-data` instead of `mic-audio-data`. The server's VAD engine detects speech boundaries and triggers transcription automatically, emitting `control: mic-audio-end` when speech ends.
+
+## Proxy mode — `/proxy-ws`
+
+When a client connects to `/proxy-ws`, the `ProxyHandler` opens a second WebSocket connection to the configured backend server URL and relays messages transparently in both directions. This is useful when the frontend is hosted on a different origin and cannot connect directly to the backend WebSocket.
+
+Configure the backend URL in `conf.yaml`:
+
+```yaml conf.yaml
+system_config:
+  server_url: "ws://actual-backend-host:12393/client-ws"
+```
+
+## Implementing a new message handler
+
+To handle a new message type in `WebSocketHandler`:
+
+1. Add the type string to the `MessageType` enum in `websocket_handler.py`.
+2. Write a method following the `_handle_*` naming convention:
+
+   ```python
+   async def _handle_my_message(
+       self, websocket: WebSocket, client_uid: str, data: WSMessage
+   ) -> None:
+       # process data
+       await websocket.send_text(json.dumps({"type": "my-response", ...}))
+   ```
+
+3. Register it in `_init_message_handlers()`:
+
+   ```python
+   "my-message-type": self._handle_my_message,
+   ```

@@ -1,122 +1,141 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Open LLM VTuber",
+  "theme": "almond",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#9c5c6c",
+    "light": "#3f3a6c",
+    "dark": "#c6b3ca"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/cca17bc0-f434-42f8-adbe-eb2546383aae.png",
+  "logo": {
+    "light": "https://media.brand.dev/cca17bc0-f434-42f8-adbe-eb2546383aae.png",
+    "dark": "https://media.brand.dev/cca17bc0-f434-42f8-adbe-eb2546383aae.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Open-LLM-VTuber/Open-LLM-VTuber"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Open-LLM-VTuber/Open-LLM-VTuber"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Getting Started",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Introduction",
+            "pages": ["introduction", "quick-start"]
+          },
+          {
+            "group": "Installation",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "installation/windows",
+              "installation/macos",
+              "installation/linux",
+              "installation/docker"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "concepts/architecture",
+              "concepts/configuration",
+              "concepts/characters"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "User Guide",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Configuration",
             "pages": [
-              "api-reference/introduction"
+              "user-guide/configuration-overview",
+              "user-guide/character-customization",
+              "user-guide/live2d-models"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "LLM Backends",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "user-guide/llm/overview",
+              "user-guide/llm/ollama",
+              "user-guide/llm/openai-compatible",
+              "user-guide/llm/cloud-providers"
+            ]
+          },
+          {
+            "group": "Speech Recognition (ASR)",
+            "pages": [
+              "user-guide/asr/overview",
+              "user-guide/asr/sherpa-onnx",
+              "user-guide/asr/faster-whisper",
+              "user-guide/asr/cloud-asr"
+            ]
+          },
+          {
+            "group": "Text-to-Speech (TTS)",
+            "pages": [
+              "user-guide/tts/overview",
+              "user-guide/tts/edge-tts",
+              "user-guide/tts/local-tts",
+              "user-guide/tts/cloud-tts"
+            ]
+          },
+          {
+            "group": "Advanced Features",
+            "pages": [
+              "user-guide/voice-interruption",
+              "user-guide/visual-perception",
+              "user-guide/pet-mode",
+              "user-guide/live-streaming",
+              "user-guide/mcp-tools"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development Guide",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "development-guide/overview",
+              "development-guide/project-structure"
+            ]
+          },
+          {
+            "group": "Extending the System",
+            "pages": [
+              "development-guide/custom-llm",
+              "development-guide/custom-asr",
+              "development-guide/custom-tts",
+              "development-guide/custom-agent"
+            ]
+          },
+          {
+            "group": "WebSocket API",
+            "pages": [
+              "development-guide/websocket-protocol",
+              "development-guide/message-types"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "development-guide/contributing",
+              "development-guide/code-style"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

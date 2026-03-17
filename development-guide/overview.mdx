@@ -1,0 +1,130 @@
+---
+title: Development overview
+description: An introduction to the Open LLM VTuber codebase, development workflow, and key architectural patterns.
+---
+
+Open LLM VTuber is a modular, Python-based application built on FastAPI. Each AI subsystem — LLM, ASR, TTS, and VAD — follows the same factory pattern, making it straightforward to swap implementations or add new ones.
+
+This section covers everything you need to contribute to the project or extend it with custom components.
+
+## Prerequisites
+
+Before starting, make sure you have:
+
+- Python 3.10–3.12
+- [uv](https://docs.astral.sh/uv/) (modern Python package manager)
+- Git
+
+## Essential commands
+
+<CodeGroup>
+
+```bash Install dependencies
+uv sync
+```
+
+```bash Run the server
+uv run run_server.py
+```
+
+```bash Run with verbose logging
+uv run run_server.py --verbose
+```
+
+```bash Update the project
+uv run upgrade.py
+```
+
+```bash Lint code
+ruff check .
+```
+
+```bash Format code
+ruff format .
+```
+
+```bash Run pre-commit hooks
+pre-commit run --all-files
+```
+
+</CodeGroup>
+
+## Architecture overview
+
+The system is built around three layers:
+
+<CardGroup cols={2}>
+  <Card title="WebSocket server" icon="plug">
+    A FastAPI server (`server.py`) that accepts WebSocket connections from the browser frontend or desktop client. Each connection gets its own isolated `ServiceContext`.
+  </Card>
+  <Card title="Service context" icon="box">
+    A dependency injection container (`service_context.py`) that holds references to the active ASR, TTS, agent, VAD, and translation engines for a single session.
+  </Card>
+  <Card title="Engine factories" icon="gear">
+    `ASRFactory`, `TTSFactory`, and `AgentFactory` read the YAML configuration and instantiate the correct engine implementation. Adding a new provider means adding a branch to the factory.
+  </Card>
+  <Card title="Conversation pipeline" icon="message">
+    The `conversations/` module orchestrates the full turn: audio → ASR → agent → TTS → audio → Live2D expression. Group and individual conversations are handled separately.
+  </Card>
+</CardGroup>
+
+## Key development patterns
+
+### Factory pattern for engines
+
+Every AI engine type has a factory class and an abstract interface:
+
+| Interface | Factory | Directory |
+|---|---|---|
+| `ASRInterface` | `ASRFactory` | `src/open_llm_vtuber/asr/` |
+| `TTSInterface` | `TTSFactory` | `src/open_llm_vtuber/tts/` |
+| `AgentInterface` | `AgentFactory` | `src/open_llm_vtuber/agent/` |
+| `StatelessLLMInterface` | `LLMFactory` | `src/open_llm_vtuber/agent/stateless_llm/` |
+
+To add a new provider, implement the interface and register the new class in the factory.
+
+### WebSocket message handling
+
+Incoming messages are dispatched by type through a dictionary of handlers initialised in `_init_message_handlers()` inside `WebSocketHandler`. To add a new message type:
+
+1. Add the type string to the `MessageType` enum.
+2. Write a `_handle_*` method.
+3. Register it in `_init_message_handlers()`.
+
+### Configuration management
+
+All configuration is type-safe using Pydantic models in `config_manager/`. When you add a new engine option:
+
+- Add a config class in `config_manager/`.
+- Update `config_templates/conf.default.yaml`.
+- Update `config_templates/conf.ZH.default.yaml`.
+- Maintain backward compatibility wherever possible.
+
+## Development guide sections
+
+<CardGroup cols={2}>
+  <Card title="Project structure" icon="folder-tree" href="/development-guide/project-structure">
+    A tour of every directory and important file in the repository.
+  </Card>
+  <Card title="Custom LLM" icon="brain" href="/development-guide/custom-llm">
+    Add a new stateless LLM provider.
+  </Card>
+  <Card title="Custom ASR" icon="microphone" href="/development-guide/custom-asr">
+    Add a new speech recognition engine.
+  </Card>
+  <Card title="Custom TTS" icon="volume-2" href="/development-guide/custom-tts">
+    Add a new text-to-speech engine.
+  </Card>
+  <Card title="Custom agent" icon="robot" href="/development-guide/custom-agent">
+    Implement a new conversation agent.
+  </Card>
+  <Card title="WebSocket protocol" icon="network" href="/development-guide/websocket-protocol">
+    Understand the WebSocket endpoints and connection lifecycle.
+  </Card>
+  <Card title="Message types" icon="list" href="/development-guide/message-types">
+    Full reference for every WebSocket message type.
+  </Card>
+  <Card title="Contributing" icon="git-pull-request" href="/development-guide/contributing">
+    How to open a pull request and what to expect.
+  </Card>
+</CardGroup>

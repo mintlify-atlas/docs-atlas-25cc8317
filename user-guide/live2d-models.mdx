@@ -1,0 +1,210 @@
+---
+title: 'Live2D models'
+description: 'Add custom Live2D models, configure model_dict.json, and control facial expressions through the LLM.'
+---
+
+Open LLM VTuber renders Live2D models in the frontend. Models are stored in the `live2d-models/` directory and registered in `model_dict.json`. The LLM controls facial expressions by emitting emotion keywords defined in each model's `emotionMap`.
+
+## Directory structure
+
+```
+live2d-models/
+├── mao_pro/
+│   ├── ReadMe.txt
+│   └── runtime/
+│       └── mao_pro.model3.json
+└── shizuku/
+    └── runtime/
+        └── ...
+```
+
+Each model lives in its own subdirectory. The entry point is a `.model3.json` file inside the `runtime/` folder (or wherever the model's files are organized).
+
+## model_dict.json
+
+`model_dict.json` in the project root maps model names to their file paths and configuration. The server reads this file to serve models to the frontend.
+
+```json
+[
+  {
+    "name": "mao_pro",
+    "description": "",
+    "url": "/live2d-models/mao_pro/runtime/mao_pro.model3.json",
+    "kScale": 0.5,
+    "initialXshift": 0,
+    "initialYshift": 0,
+    "kXOffset": 1150,
+    "idleMotionGroupName": "Idle",
+    "emotionMap": {
+      "neutral": 0,
+      "anger": 2,
+      "disgust": 2,
+      "fear": 1,
+      "joy": 3,
+      "smirk": 3,
+      "sadness": 1,
+      "surprise": 3
+    },
+    "tapMotions": {
+      "HitAreaHead": { "": 1 },
+      "HitAreaBody": { "": 1 }
+    }
+  }
+]
+```
+
+### model_dict.json fields
+
+<ParamField path="name" type="string" required>
+  The identifier used to reference this model in `character_config.live2d_model_name`. Must be unique across all entries.
+</ParamField>
+
+<ParamField path="url" type="string" required>
+  The URL path (relative to the server root) to the `.model3.json` file. Use the `/live2d-models/` prefix since the server serves this directory statically.
+</ParamField>
+
+<ParamField path="kScale" type="number">
+  Scale factor applied to the model. Adjust if the model appears too large or too small in the viewport.
+</ParamField>
+
+<ParamField path="initialXshift" type="number">
+  Horizontal offset applied on load, in pixels.
+</ParamField>
+
+<ParamField path="initialYshift" type="number">
+  Vertical offset applied on load, in pixels.
+</ParamField>
+
+<ParamField path="kXOffset" type="number">
+  Horizontal offset for the model's canvas anchor point.
+</ParamField>
+
+<ParamField path="idleMotionGroupName" type="string">
+  The motion group name from the model's `.model3.json` that plays during idle state. Common values: `Idle`, `idle`.
+</ParamField>
+
+<ParamField path="emotionMap" type="object">
+  Maps emotion keyword names to expression indices defined in the model. The LLM emits these keywords in responses to trigger expressions. See [Expression control](#expression-control) below.
+</ParamField>
+
+<ParamField path="tapMotions" type="object">
+  Defines motion responses when the user clicks on named hit areas of the model (such as head or body).
+</ParamField>
+
+## Adding a custom model
+
+<Steps>
+  <Step title="Copy your model files">
+    Place your model directory inside `live2d-models/`. The directory should contain the `.model3.json` file and all associated textures, motions, and physics files.
+
+    ```
+    live2d-models/
+    └── my_model/
+        └── runtime/
+            ├── my_model.model3.json
+            ├── my_model.moc3
+            ├── textures/
+            └── motions/
+    ```
+  </Step>
+
+  <Step title="Add an entry to model_dict.json">
+    Open `model_dict.json` and add a new object to the array:
+
+    ```json
+    {
+      "name": "my_model",
+      "description": "My custom Live2D model",
+      "url": "/live2d-models/my_model/runtime/my_model.model3.json",
+      "kScale": 0.5,
+      "initialXshift": 0,
+      "initialYshift": 0,
+      "kXOffset": 0,
+      "idleMotionGroupName": "Idle",
+      "emotionMap": {
+        "neutral": 0,
+        "joy": 1,
+        "sadness": 2,
+        "anger": 3
+      },
+      "tapMotions": {}
+    }
+    ```
+
+    The `emotionMap` values are expression indices from your model. Open the `.model3.json` file to find the list of expressions defined under `"Expressions"`.
+  </Step>
+
+  <Step title="Set live2d_model_name in your character config">
+    Update `conf.yaml` or a character file to reference the new model:
+
+    ```yaml
+    character_config:
+      live2d_model_name: 'my_model'
+    ```
+  </Step>
+
+  <Step title="Restart the server">
+    ```bash
+    uv run run_server.py
+    ```
+
+    The model will load in the frontend.
+  </Step>
+</Steps>
+
+<Note>
+Only `.model3.json` (Live2D Cubism 3 and later) format is supported. Older `.model.json` (Cubism 2) files are not supported.
+</Note>
+
+## Expression control
+
+The LLM controls facial expressions by including emotion keywords in its responses. This is enabled by the `live2d_expression_prompt` tool prompt in `system_config`.
+
+### How it works
+
+1. The `live2d_expression_prompt` is appended to the character's system prompt.
+2. The available emotion keywords from the model's `emotionMap` are injected into the prompt at the `[<insert_emomap_keys>]` placeholder.
+3. The LLM includes one of these keywords in its response text.
+4. The frontend intercepts the keyword and triggers the corresponding expression index on the model.
+
+### Enabling expression control
+
+Make sure `live2d_expression_prompt` is set in `system_config.tool_prompts`:
+
+```yaml
+system_config:
+  tool_prompts:
+    live2d_expression_prompt: 'live2d_expression_prompt'
+```
+
+This setting is enabled by default. If you remove or comment it out, the LLM will not emit expression keywords.
+
+### emotionMap reference
+
+The `emotionMap` in `model_dict.json` maps keyword names to expression indices:
+
+```json
+"emotionMap": {
+  "neutral": 0,
+  "anger": 2,
+  "disgust": 2,
+  "fear": 1,
+  "joy": 3,
+  "smirk": 3,
+  "sadness": 1,
+  "surprise": 3
+}
+```
+
+The integer values correspond to the order of expressions in the model's `.model3.json` `Expressions` array (zero-indexed). Multiple keywords can map to the same index — for example, both `anger` and `disgust` trigger expression index `2` in the default model.
+
+You can add or rename keywords freely. The LLM learns the available keywords from the injected prompt and will use the names you define.
+
+## Supported model format
+
+| Format | Support |
+|---|---|
+| `.model3.json` (Cubism 3+) | Supported |
+| `.model.json` (Cubism 2) | Not supported |
+
+Commercial Live2D models may have separate licensing terms for use in software. Check the license of any model you use.

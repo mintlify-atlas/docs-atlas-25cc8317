@@ -1,0 +1,89 @@
+---
+title: 'Voice interruption'
+description: 'Configure Silero VAD to let you interrupt the AI mid-speech without headphones or push-to-talk.'
+---
+
+Voice Activity Detection (VAD) enables voice interruption: the AI stops speaking as soon as it detects you talking. Without VAD, the AI would hear its own voice through your microphone and interpret it as user input.
+
+## How it works
+
+When VAD is enabled, the client continuously monitors the microphone. When it detects speech that meets the configured probability and decibel thresholds, it sends a `<|PAUSE|>` signal to the server, which interrupts ongoing TTS playback. When silence is detected for long enough, a `<|RESUME|>` signal allows input again.
+
+This removes the need for headphones or push-to-talk during natural conversation.
+
+## Enabling VAD
+
+VAD is disabled by default. To enable it, set `vad_model` to `'silero_vad'`:
+
+```yaml
+character_config:
+  vad_config:
+    vad_model: 'silero_vad'
+
+    silero_vad:
+      orig_sr: 16000
+      target_sr: 16000
+      prob_threshold: 0.4
+      db_threshold: 60
+      required_hits: 3
+      required_misses: 24
+      smoothing_window: 5
+```
+
+To disable VAD, set `vad_model: null`.
+
+## Configuration reference
+
+<ParamField path="vad_model" type="string | null" default="null">
+  VAD engine to use. Currently supported: `silero_vad`. Set to `null` to disable voice interruption entirely.
+</ParamField>
+
+<ParamField path="silero_vad.prob_threshold" type="number" default="0.4">
+  Minimum speech probability (0.0–1.0) required to consider a chunk as speech. Higher values make detection less sensitive — useful in noisy environments to avoid false triggers.
+</ParamField>
+
+<ParamField path="silero_vad.db_threshold" type="integer" default="60">
+  Minimum volume level in decibels (dB) required to classify audio as speech. This acts as a second gate alongside `prob_threshold` — both must be met simultaneously.
+</ParamField>
+
+<ParamField path="silero_vad.required_hits" type="integer" default="3">
+  Number of consecutive 32ms audio chunks that must meet both thresholds before speech is declared. `3` corresponds to approximately 96ms. Increase this to reduce false interruptions from brief sounds.
+</ParamField>
+
+<ParamField path="silero_vad.required_misses" type="integer" default="24">
+  Number of consecutive chunks below threshold before speech is declared ended. `24` corresponds to approximately 768ms of silence. Decrease this if the AI resumes too slowly after you stop speaking.
+</ParamField>
+
+<ParamField path="silero_vad.smoothing_window" type="integer" default="5">
+  Number of recent chunks used for smoothing probability and dB values. A larger window reduces jitter but increases reaction time.
+</ParamField>
+
+## Tuning for your environment
+
+<AccordionGroup>
+  <Accordion title="Too many false interruptions (noisy room or fan noise)">
+    Increase `prob_threshold` (e.g., `0.6`) and `db_threshold` (e.g., `70`). You can also increase `required_hits` to `5` so short sounds don't trigger interruption.
+  </Accordion>
+
+  <Accordion title="AI doesn't stop when I speak">
+    Lower `prob_threshold` (e.g., `0.3`) or `db_threshold` (e.g., `50`). If you're using speakers instead of headphones, the AI's output audio may be bleeding into the microphone — consider using headphones.
+  </Accordion>
+
+  <Accordion title="AI resumes too slowly after I stop speaking">
+    Decrease `required_misses` (e.g., `12–16`) so the AI considers silence sooner.
+  </Accordion>
+
+  <Accordion title="AI resumes too quickly (cuts off my short pauses)">
+    Increase `required_misses` (e.g., `32–48`) to give more tolerance for natural pauses in speech.
+  </Accordion>
+</AccordionGroup>
+
+## Notes
+
+<Note>
+Silero VAD requires the `silero-vad` Python package and PyTorch. These are included in the standard installation.
+</Note>
+
+<Warning>
+VAD-based interruption works best with headphones. If you are using speakers, the AI's voice may leak into the microphone and trigger false detections, especially in quiet rooms where the AI's volume is high relative to your ambient noise floor.
+</Warning>

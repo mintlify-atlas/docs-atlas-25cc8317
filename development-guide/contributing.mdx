@@ -1,0 +1,122 @@
+---
+title: Contributing
+description: How to contribute to Open LLM VTuber — fork workflow, pull request process, community channels, and what kinds of contributions are welcome.
+---
+
+Contributions are welcome and encouraged. Whether you are fixing a bug, adding a new engine, improving documentation, or translating strings, the process is the same.
+
+## Community
+
+Before diving into code, consider joining the community:
+
+<CardGroup cols={2}>
+  <Card title="Discord" icon="discord">
+    The primary community hub for discussions, questions, and announcements.
+  </Card>
+  <Card title="GitHub Issues" icon="github">
+    Report bugs and request features at the [project repository](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber/issues).
+  </Card>
+</CardGroup>
+
+## Types of contributions
+
+- **Bug fixes** — anything from typos to incorrect logic
+- **New engine implementations** — ASR, TTS, LLM, or agent backends
+- **Documentation** — corrections, new pages, translated content
+- **Configuration templates** — example character configs
+- **Tests** — adding coverage for untested code paths
+- **Performance improvements** — latency, memory usage, startup time
+
+## Fork and branch workflow
+
+<Steps>
+  <Step title="Fork the repository">
+    Fork [Open-LLM-VTuber/Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) on GitHub and clone your fork locally:
+
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/Open-LLM-VTuber.git
+    cd Open-LLM-VTuber
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    uv sync
+    ```
+  </Step>
+
+  <Step title="Install pre-commit hooks">
+    ```bash
+    pre-commit install
+    ```
+
+    This installs Ruff as a pre-commit hook so your code is linted and formatted automatically before every commit.
+  </Step>
+
+  <Step title="Create a branch">
+    Create a descriptive branch name:
+
+    ```bash
+    git checkout -b add-openai-tts-streaming
+    ```
+
+    Use prefixes like `fix/`, `feat/`, or `docs/` if you prefer.
+  </Step>
+
+  <Step title="Make your changes">
+    Follow the patterns in the existing codebase:
+
+    - Implement the relevant interface (`ASRInterface`, `TTSInterface`, etc.)
+    - Register your implementation in the factory
+    - Update both YAML config templates
+    - Add a Pydantic config class in `config_manager/`
+    - Run `ruff check .` and `ruff format .` before committing
+  </Step>
+
+  <Step title="Verify code quality">
+    ```bash
+    ruff check .
+    ruff format .
+    ```
+
+    If pre-commit hooks are installed, they run automatically on `git commit`. To run them manually:
+
+    ```bash
+    pre-commit run --all-files
+    ```
+  </Step>
+
+  <Step title="Open a pull request">
+    Push your branch and open a pull request against the `main` branch of the upstream repository. In your PR description:
+
+    - Summarise what the change does
+    - List any new dependencies added to `pyproject.toml`
+    - Include steps to test the change
+    - Mention any related issues with `Closes #123`
+  </Step>
+</Steps>
+
+## Pull request guidelines
+
+- **One concern per PR.** Keep changes focused — separate a new TTS engine from an unrelated refactor.
+- **Update both config templates** when adding configurable options (`conf.default.yaml` and `conf.ZH.default.yaml`).
+- **Lazy imports in factories.** Import new engine classes inside the `elif` branch so the dependency is only loaded when selected.
+- **No breaking changes without a migration path.** If you rename a config key, update the upgrade script or provide a compatibility alias.
+- **Docstrings** for all public methods you add or modify.
+
+## Development guide references
+
+<CardGroup cols={2}>
+  <Card title="Custom LLM" icon="brain" href="/development-guide/custom-llm">
+    Add a new LLM provider.
+  </Card>
+  <Card title="Custom ASR" icon="microphone" href="/development-guide/custom-asr">
+    Add a new speech recognition engine.
+  </Card>
+  <Card title="Custom TTS" icon="volume-2" href="/development-guide/custom-tts">
+    Add a new text-to-speech engine.
+  </Card>
+  <Card title="Code style" icon="code" href="/development-guide/code-style">
+    Linting and formatting rules.
+  </Card>
+</CardGroup>

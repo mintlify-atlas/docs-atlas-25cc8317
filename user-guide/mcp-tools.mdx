@@ -1,0 +1,164 @@
+---
+title: 'MCP tools'
+description: 'Give the AI access to external tools using the Model Context Protocol (MCP).'
+---
+
+MCP (Model Context Protocol) lets the AI call external tools such as web search, time lookup, file system access, and more. Open LLM VTuber implements MCP Plus (`use_mcpp`), which enables tool calling through the standard OpenAI function-calling format.
+
+## How it works
+
+1. You define MCP servers in `mcp_servers.json`.
+2. You list the servers the AI is allowed to use in `mcp_enabled_servers`.
+3. At runtime, the `basic_memory_agent` starts only the enabled servers on demand and calls their tools when the LLM requests them.
+4. The `mcp_prompt` in `system_config.tool_prompts` injects instructions into the system prompt telling the LLM how to use tools.
+
+## Enabling MCP
+
+<Steps>
+  <Step title="Enable use_mcpp and add servers">
+    In `conf.yaml`, under `basic_memory_agent`:
+
+    ```yaml
+    character_config:
+      agent_config:
+        agent_settings:
+          basic_memory_agent:
+            use_mcpp: true
+            mcp_enabled_servers:
+              - 'time'
+              - 'ddg-search'
+    ```
+  </Step>
+  <Step title="Enable the mcp_prompt">
+    In `system_config.tool_prompts`, uncomment or add the `mcp_prompt` entry:
+
+    ```yaml
+    system_config:
+      tool_prompts:
+        mcp_prompt: 'mcp_prompt'
+    ```
+
+    This appends tool-use instructions to the LLM's system prompt at runtime.
+  </Step>
+  <Step title="Verify mcp_servers.json">
+    Confirm that the server names in `mcp_enabled_servers` exist in `mcp_servers.json`.
+  </Step>
+</Steps>
+
+## Agent settings reference
+
+<ParamField path="use_mcpp" type="boolean" default="false">
+  Enables MCP Plus. When `true`, the agent can call tools defined in the enabled MCP servers. Also requires `mcp_prompt` to be active in `system_config.tool_prompts`.
+</ParamField>
+
+<ParamField path="mcp_enabled_servers" type="array" default="['time', 'ddg-search']">
+  List of MCP server names to make available to the AI. Must match keys defined in `mcp_servers.json`. Only listed servers are started.
+</ParamField>
+
+## mcp_servers.json
+
+All MCP server definitions are stored in `mcp_servers.json` at the project root.
+
+```json
+{
+  "mcp_servers": {
+    "time": {
+      "command": "uvx",
+      "args": ["mcp-server-time", "--local-timezone=Asia/Shanghai"]
+    },
+    "ddg-search": {
+      "command": "uvx",
+      "args": ["duckduckgo-mcp-server"]
+    }
+  }
+}
+```
+
+Each server entry has the following fields:
+
+<ParamField path="command" type="string" required>
+  The executable to run the server. Typically `uvx` (for Python MCP packages via uv) or `npx` (for Node.js MCP packages). The corresponding runtime must be installed and available in `PATH`.
+</ParamField>
+
+<ParamField path="args" type="array" required>
+  Arguments to pass to the command. The first argument is usually the MCP server package name.
+</ParamField>
+
+<ParamField path="env" type="object">
+  Optional environment variables to set for the server process (e.g., API keys).
+</ParamField>
+
+<ParamField path="cwd" type="string">
+  Optional working directory for the server process.
+</ParamField>
+
+<ParamField path="timeout" type="number">
+  Optional timeout in seconds for tool calls. Defaults to 30 seconds.
+</ParamField>
+
+## Default servers
+
+### time
+
+Provides current time and timezone information.
+
+- **Package**: `mcp-server-time` (installed via `uvx`)
+- **Provides**: Current local time, time zone conversion
+- **Configuration**: The `--local-timezone` argument sets the default timezone (default: `Asia/Shanghai`)
+
+To change the timezone:
+
+```json
+"time": {
+  "command": "uvx",
+  "args": ["mcp-server-time", "--local-timezone=America/New_York"]
+}
+```
+
+### ddg-search
+
+Provides DuckDuckGo web search.
+
+- **Package**: `duckduckgo-mcp-server` (installed via `uvx`)
+- **Provides**: Web search queries and result summaries
+- **No API key required**
+
+## Adding a custom MCP server
+
+You can add any MCP-compatible server to `mcp_servers.json`:
+
+```json
+{
+  "mcp_servers": {
+    "time": {
+      "command": "uvx",
+      "args": ["mcp-server-time", "--local-timezone=Asia/Shanghai"]
+    },
+    "ddg-search": {
+      "command": "uvx",
+      "args": ["duckduckgo-mcp-server"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/documents"]
+    }
+  }
+}
+```
+
+Then add the server name to `mcp_enabled_servers` in `conf.yaml`:
+
+```yaml
+mcp_enabled_servers:
+  - 'time'
+  - 'ddg-search'
+  - 'filesystem'
+```
+
+<Note>
+MCP requires the `basic_memory_agent`. The `letta_agent` and `hume_ai_agent` do not support MCP Plus.
+</Note>
+
+<Warning>
+MCP servers run as subprocesses. Only add servers from trusted sources, as they execute with the same permissions as the Open LLM VTuber process.
+</Warning>

@@ -1,0 +1,48 @@
+---
+title: 'Pet mode'
+description: 'Run your AI companion as a transparent desktop overlay with click-through support.'
+---
+
+Pet mode turns your AI companion into a floating desktop character. The window becomes transparent, stays on top of all other applications, and lets mouse clicks pass through to the window underneath.
+
+## Requirements
+
+Pet mode is available in the **desktop client** only. It is not available in the browser-based web frontend.
+
+The desktop client is a separate downloadable application built with Electron (Windows/macOS/Linux). Download it from the project releases page.
+
+## Enabling pet mode
+
+<Steps>
+  <Step title="Open the desktop client">
+    Launch the Open LLM VTuber desktop client. It connects to your running server automatically.
+  </Step>
+  <Step title="Open settings">
+    Click the settings icon in the desktop client UI.
+  </Step>
+  <Step title="Enable pet mode">
+    Toggle **Pet mode** in the settings panel. The window will become transparent and float above all other windows.
+  </Step>
+</Steps>
+
+## What pet mode does
+
+- **Transparent background**: The character renders on a transparent background so only the Live2D model is visible — not a browser window.
+- **Always on top**: The window stays in the foreground above all other applications.
+- **Click-through**: Mouse clicks pass through the transparent areas of the window to whatever application is behind it. You can interact with other applications normally while the character is visible.
+- **Draggable character**: Click and drag the character to move them anywhere on your screen.
+
+## Interacting with the character in pet mode
+
+Because the window is click-through, you interact with the character itself, not the window frame.
+
+- **Drag**: Click and hold anywhere on the character model to drag them to a new position.
+- **Right-click**: Right-clicking on the character opens a context menu with options including toggling pet mode, opening settings, and closing the application.
+
+## Exiting pet mode
+
+To exit pet mode, right-click on the character and deselect **Pet mode**, or open the settings panel from the context menu.
+
+<Note>
+Pet mode window position is not saved between sessions in all versions of the client. You may need to reposition the character after restarting.
+</Note>

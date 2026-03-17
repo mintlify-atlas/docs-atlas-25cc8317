@@ -1,0 +1,167 @@
+---
+title: 'Linux'
+description: 'Install Open-LLM-VTuber on Linux with CPU-only or NVIDIA CUDA support.'
+---
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install system dependencies">
+    Install Git and ffmpeg using your distribution's package manager:
+
+    <Tabs>
+      <Tab title="Ubuntu / Debian">
+        ```bash
+        sudo apt update
+        sudo apt install -y git ffmpeg
+        ```
+      </Tab>
+      <Tab title="Fedora / RHEL">
+        ```bash
+        sudo dnf install -y git ffmpeg
+        ```
+      </Tab>
+      <Tab title="Arch Linux">
+        ```bash
+        sudo pacman -S git ffmpeg
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Install Python 3.10–3.12">
+    <Tabs>
+      <Tab title="Ubuntu / Debian">
+        ```bash
+        sudo apt install -y python3.12 python3.12-venv
+        ```
+      </Tab>
+      <Tab title="Using pyenv">
+        ```bash
+        curl https://pyenv.run | bash
+        pyenv install 3.12
+        pyenv global 3.12
+        ```
+      </Tab>
+    </Tabs>
+
+    <Warning>
+    Python 3.13 is not supported. Use Python 3.10, 3.11, or 3.12.
+    </Warning>
+  </Step>
+
+  <Step title="Install uv">
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+    Restart your shell, then verify:
+
+    ```bash
+    uv --version
+    ```
+  </Step>
+
+  <Step title="Install Ollama (default LLM backend)">
+    ```bash
+    curl -fsSL https://ollama.com/install.sh | sh
+    ollama pull qwen2.5:latest
+    ```
+  </Step>
+</Steps>
+
+## Clone and install
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/Open-LLM-VTuber/Open-LLM-VTuber.git
+    cd Open-LLM-VTuber
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    uv sync
+    ```
+  </Step>
+
+  <Step title="Run the server">
+    ```bash
+    uv run run_server.py
+    ```
+
+    Open `http://localhost:12393` in your browser.
+  </Step>
+</Steps>
+
+## NVIDIA CUDA support
+
+For NVIDIA GPU acceleration, the project provides pixi-based dependency management with CUDA support. The `pyproject.toml` defines pixi targets for `linux-64` with:
+
+- `cudatoolkit >=11.0,<12`
+- `cudnn >=8.0,<9`
+
+Install [pixi](https://pixi.sh) and use it to install the full CUDA stack:
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | sh
+pixi install
+pixi run uv run run_server.py
+```
+
+To enable GPU inference in sherpa-onnx, update `conf.yaml`:
+
+```yaml
+character_config:
+  asr_config:
+    sherpa_onnx_asr:
+      provider: 'cuda'
+```
+
+For Faster-Whisper with CUDA:
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'faster_whisper'
+    faster_whisper:
+      device: 'cuda'
+      compute_type: 'int8'
+```
+
+## CPU-only mode
+
+The default configuration (`uv sync`) runs entirely on CPU. No NVIDIA GPU is required. The sherpa-onnx SenseVoice ASR model and Edge TTS work on CPU with acceptable performance.
+
+To explicitly set CPU inference:
+
+```yaml
+character_config:
+  asr_config:
+    sherpa_onnx_asr:
+      provider: 'cpu'
+      num_threads: 4
+```
+
+## Verbose logging
+
+```bash
+uv run run_server.py --verbose
+```
+
+Logs are written to `logs/debug_<date>.log`.
+
+## Remote access
+
+To make the server accessible from other machines, change the `host` setting in `conf.yaml`:
+
+```yaml
+system_config:
+  host: '0.0.0.0'
+  port: 12393
+```
+
+<Warning>
+The browser microphone API requires a secure context (HTTPS or localhost). To access the interface from a remote machine, set up HTTPS using a reverse proxy such as nginx or Caddy.
+</Warning>

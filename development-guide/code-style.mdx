@@ -1,0 +1,142 @@
+---
+title: Code style
+description: Linting and formatting rules for Open LLM VTuber, including Ruff configuration and pre-commit hook setup.
+---
+
+Open LLM VTuber uses [Ruff](https://docs.astral.sh/ruff/) for both linting and formatting. Ruff is fast, has no external dependencies beyond what is already in `pyproject.toml`, and replaces `flake8`, `isort`, `pyupgrade`, and `black` in a single tool.
+
+## Running Ruff
+
+```bash
+# Check for lint issues
+ruff check .
+
+# Fix auto-fixable issues
+ruff check . --fix
+
+# Format all files
+ruff format .
+
+# Check formatting without applying changes
+ruff format . --check
+```
+
+<Tip>
+Run `ruff check . && ruff format .` before every commit, or install the pre-commit hooks to have this happen automatically.
+</Tip>
+
+## Configuration
+
+Ruff is configured in `pyproject.toml`:
+
+```toml pyproject.toml
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+# Ignore E402 (module level import not at top of file)
+# for the run_bilibili_live.py script
+per-file-ignores = { "scripts/run_bilibili_live.py" = ["E402"] }
+```
+
+`target-version = "py310"` means Ruff enforces Python 3.10 compatibility and allows `match` statements, `X | Y` type unions, and other 3.10+ syntax.
+
+## Pre-commit hooks
+
+The repository ships with a `.pre-commit-config.yaml` that runs Ruff on every commit:
+
+```yaml .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.6
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+```
+
+The `--fix` flag auto-corrects fixable issues before the commit proceeds. The `--exit-non-zero-on-fix` flag causes the commit to fail if any fixes were applied, so you can review the changes before retrying the commit.
+
+### Installing the hooks
+
+```bash
+pre-commit install
+```
+
+This only needs to be run once after cloning the repository. After that, Ruff runs automatically on every `git commit`.
+
+To run the hooks manually against all files:
+
+```bash
+pre-commit run --all-files
+```
+
+## Key style rules
+
+Beyond Ruff's defaults, the codebase follows these conventions:
+
+### Imports
+
+Use lazy imports inside factory `elif` branches to avoid loading heavy dependencies at startup:
+
+```python
+# Good — only imported when this engine is selected
+elif system_name == "my_asr":
+    from .my_asr import VoiceRecognition as MyASR
+    return MyASR(**kwargs)
+
+# Avoid — imported on every startup
+from .my_asr import VoiceRecognition as MyASR
+
+elif system_name == "my_asr":
+    return MyASR(**kwargs)
+```
+
+### Logging
+
+Use `loguru` for all logging. Import it as:
+
+```python
+from loguru import logger
+```
+
+Level guidance:
+
+| Level | When to use |
+|---|---|
+| `logger.debug` | Detailed state for troubleshooting |
+| `logger.info` | Normal operational events (engine initialised, config loaded) |
+| `logger.warning` | Unexpected but recoverable conditions |
+| `logger.error` | Errors that affect a single request |
+| `logger.critical` | Errors that may prevent the application from functioning |
+
+### Error handling
+
+Always handle exceptions at the WebSocket handler level and send an error message back to the client rather than letting the exception propagate silently:
+
+```python
+try:
+    result = await some_operation()
+except Exception as e:
+    logger.error(f"Operation failed: {e}")
+    await websocket.send_text(
+        json.dumps({"type": "error", "message": str(e)})
+    )
+```
+
+### Factory pattern
+
+New engine implementations belong in their subsystem directory (`asr/`, `tts/`, `agent/stateless_llm/`). The factory class in that directory is the only place that imports them. This keeps dependencies isolated and startup fast.
+
+### Configuration changes
+
+When modifying configurable behaviour, always:
+
+1. Add or update the Pydantic model in `config_manager/`.
+2. Update `config_templates/conf.default.yaml`.
+3. Update `config_templates/conf.ZH.default.yaml`.
+4. Maintain backward compatibility — if a key is renamed, support the old key with a deprecation warning until the next major release.
+
+## CI/CD
+
+GitHub Actions runs Ruff on every pull request. A PR with lint errors or formatting violations will not be merged. Run `ruff check . && ruff format .` locally before pushing to avoid CI failures.

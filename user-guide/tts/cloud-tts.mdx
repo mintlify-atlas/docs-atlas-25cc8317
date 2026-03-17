@@ -1,0 +1,257 @@
+---
+title: 'Cloud TTS'
+description: 'Configure Azure TTS, Fish Audio, ElevenLabs, Cartesia, MiniMax, and SiliconFlow for cloud-based speech synthesis.'
+---
+
+Cloud TTS engines produce high-quality speech but require an internet connection and API credentials. Several support voice cloning from a reference audio clip.
+
+## azure_tts
+
+Microsoft Azure Neural TTS. Over 400 voices across 140+ languages.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'azure_tts'
+
+    azure_tts:
+      api_key: 'your-azure-api-key'
+      region: 'eastus'
+      voice: 'en-US-AshleyNeural'
+      pitch: '26'    # Percentage pitch adjustment
+      rate: '1'      # Speech rate multiplier
+```
+
+<ParamField path="api_key" type="string" required>
+  Your Azure Speech Service subscription key.
+</ParamField>
+
+<ParamField path="region" type="string" required>
+  Azure region (e.g., `eastus`, `westeurope`, `japaneast`).
+</ParamField>
+
+<ParamField path="voice" type="string" default="en-US-AshleyNeural">
+  Voice name. Browse the full list in the Azure Speech Studio Voice Gallery.
+</ParamField>
+
+<ParamField path="pitch" type="string" default="26">
+  Pitch adjustment as a percentage string. `0` is neutral; positive values raise pitch.
+</ParamField>
+
+<ParamField path="rate" type="string" default="1">
+  Speaking rate multiplier. `1` is normal speed; `1.5` is 50% faster.
+</ParamField>
+
+## fish_api_tts
+
+Fish Audio API supports voice cloning using a reference voice ID from the Fish Audio website.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'fish_api_tts'
+
+    fish_api_tts:
+      api_key: 'your-fish-audio-api-key'
+      reference_id: 'your-voice-reference-id'
+      latency: 'balanced'             # 'normal' or 'balanced'
+      base_url: 'https://api.fish.audio'
+```
+
+<ParamField path="api_key" type="string" required>
+  Your Fish Audio API key.
+</ParamField>
+
+<ParamField path="reference_id" type="string" required>
+  The reference ID of the voice to use. Obtain it from the Fish Audio website at `https://fish.audio`.
+</ParamField>
+
+<ParamField path="latency" type="string" default="balanced">
+  `balanced` is faster with slightly lower quality. `normal` is higher quality with higher latency.
+</ParamField>
+
+<ParamField path="base_url" type="string" default="https://api.fish.audio">
+  API base URL. Change this if you are using a self-hosted Fish Audio instance.
+</ParamField>
+
+## elevenlabs_tts
+
+ElevenLabs produces highly realistic AI voices with controllable stability and similarity.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'elevenlabs_tts'
+
+    elevenlabs_tts:
+      api_key: 'your-elevenlabs-api-key'
+      voice_id: 'your-voice-id'
+      model_id: 'eleven_multilingual_v2'
+      output_format: 'mp3_44100_128'
+      stability: 0.5
+      similarity_boost: 0.5
+      style: 0.0
+      use_speaker_boost: true
+```
+
+<ParamField path="api_key" type="string" required>
+  Your ElevenLabs API key.
+</ParamField>
+
+<ParamField path="voice_id" type="string" required>
+  The ID of the voice to use. Find voice IDs in the ElevenLabs dashboard.
+</ParamField>
+
+<ParamField path="model_id" type="string" default="eleven_multilingual_v2">
+  Model to use. `eleven_multilingual_v2` supports many languages; `eleven_monolingual_v1` is English-only but faster.
+</ParamField>
+
+<ParamField path="output_format" type="string" default="mp3_44100_128">
+  Audio output format. `mp3_44100_128` is 44.1 kHz MP3 at 128 kbps.
+</ParamField>
+
+<ParamField path="stability" type="number" default="0.5">
+  Voice stability. Higher values (toward `1.0`) produce more consistent, less expressive output.
+</ParamField>
+
+<ParamField path="similarity_boost" type="number" default="0.5">
+  Similarity to the original voice. Higher values make the output closer to the source voice.
+</ParamField>
+
+<ParamField path="style" type="number" default="0.0">
+  Style exaggeration. Higher values amplify the voice's expressive characteristics.
+</ParamField>
+
+<ParamField path="use_speaker_boost" type="boolean" default="true">
+  Enables speaker boost for improved voice clarity.
+</ParamField>
+
+## cartesia_tts
+
+Cartesia Sonic models provide low-latency, high-quality TTS with emotional guidance controls.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'cartesia_tts'
+
+    cartesia_tts:
+      api_key: 'your-cartesia-api-key'
+      voice_id: 'your-voice-id'
+      model_id: 'sonic-3'
+      output_format: 'wav'
+      language: 'en'
+      emotion: 'neutral'
+      volume: 1.0
+      speed: 1.0
+```
+
+<ParamField path="api_key" type="string" required>
+  Your Cartesia API key.
+</ParamField>
+
+<ParamField path="voice_id" type="string" required>
+  Voice ID from the Cartesia voice library.
+</ParamField>
+
+<ParamField path="model_id" type="string" default="sonic-3">
+  Cartesia model to use (e.g., `sonic-3`).
+</ParamField>
+
+<ParamField path="emotion" type="string" default="neutral">
+  Emotional guidance for the voice synthesis.
+</ParamField>
+
+<ParamField path="volume" type="number" default="1.0">
+  Volume multiplier. Range: `0.5` to `2.0`.
+</ParamField>
+
+<ParamField path="speed" type="number" default="1.0">
+  Speech speed multiplier. Range: `0.6` to `1.5`.
+</ParamField>
+
+## minimax_tts
+
+MiniMax speech API with support for multiple voices and models.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'minimax_tts'
+
+    minimax_tts:
+      group_id: 'your-minimax-group-id'
+      api_key: 'your-minimax-api-key'
+      model: 'speech-02-turbo'        # or 'speech-02-hd'
+      voice_id: 'female-shaonv'
+      pronunciation_dict: ''
+```
+
+<ParamField path="group_id" type="string" required>
+  Your MiniMax group ID.
+</ParamField>
+
+<ParamField path="api_key" type="string" required>
+  Your MiniMax API key.
+</ParamField>
+
+<ParamField path="model" type="string" default="speech-02-turbo">
+  MiniMax speech model. `speech-02-turbo` is recommended for lower latency; `speech-02-hd` is higher quality.
+</ParamField>
+
+<ParamField path="voice_id" type="string" default="female-shaonv">
+  Voice identifier from MiniMax's voice library.
+</ParamField>
+
+<ParamField path="pronunciation_dict" type="string">
+  Optional custom pronunciation dictionary in JSON format. Example: `'{"tone": ["测试/(ce4)(shi4)"]}'`.
+</ParamField>
+
+## siliconflow_tts
+
+SiliconFlow offers a CosyVoice2-based TTS API with voice customization support.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'siliconflow_tts'
+
+    siliconflow_tts:
+      api_url: 'https://api.siliconflow.cn/v1/audio/speech'
+      api_key: 'your-siliconflow-api-key'
+      default_model: 'FunAudioLLM/CosyVoice2-0.5B'
+      default_voice: 'speech:MODEL_NAME:VOICE_ID:your-voice-name'
+      sample_rate: 32000
+      response_format: 'mp3'   # 'mp3', 'opus', 'wav', or 'pcm'
+      stream: true
+      speed: 1
+      gain: 0
+```
+
+<ParamField path="api_key" type="string" required>
+  Your SiliconFlow API key.
+</ParamField>
+
+<ParamField path="default_model" type="string" default="FunAudioLLM/CosyVoice2-0.5B">
+  Model to use for synthesis.
+</ParamField>
+
+<ParamField path="default_voice" type="string">
+  Voice configuration string in the format `speech:MODEL_NAME:VOICE_ID:your-voice-name`.
+</ParamField>
+
+<ParamField path="sample_rate" type="integer" default="32000">
+  Output sample rate in Hz. Supported values depend on `response_format`: opus supports 48000 Hz; wav/pcm support 8000, 16000, 24000, 32000, 44100 Hz; mp3 supports 32000 and 44100 Hz.
+</ParamField>
+
+<ParamField path="response_format" type="string" default="mp3">
+  Output audio format. One of: `mp3`, `opus`, `wav`, `pcm`.
+</ParamField>
+
+<ParamField path="speed" type="number" default="1">
+  Speech speed. `1` is normal.
+</ParamField>
+
+<ParamField path="gain" type="number" default="0">
+  Volume gain in dB. `0` is no adjustment.
+</ParamField>

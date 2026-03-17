@@ -1,0 +1,187 @@
+---
+title: 'Configuration'
+description: 'How conf.yaml works, what each section controls, and how to switch between configurations.'
+---
+
+All server behavior is controlled by a single YAML file: `conf.yaml` in the project root. On first launch, `run_server.py` creates this file from `config_templates/conf.default.yaml` and syncs it with the latest defaults.
+
+<Note>
+Edit `conf.yaml` directly to change settings. Do not edit `config_templates/conf.default.yaml` — it is the upstream default and gets overwritten on updates.
+</Note>
+
+## File structure
+
+`conf.yaml` has two top-level sections:
+
+```yaml
+system_config:
+  # Server-level settings: host, port, tool prompts, character directory
+
+character_config:
+  # Everything about the active character: persona, LLM, ASR, TTS, VAD
+```
+
+## system_config
+
+Controls the server and shared settings that apply across all characters.
+
+```yaml
+system_config:
+  conf_version: 'v1.2.1'
+  host: 'localhost'       # Use 0.0.0.0 to allow external access
+  port: 12393
+  config_alts_dir: 'characters'   # Directory containing character YAML files
+  tool_prompts:
+    live2d_expression_prompt: 'live2d_expression_prompt'
+    group_conversation_prompt: 'group_conversation_prompt'
+    mcp_prompt: 'mcp_prompt'
+    proactive_speak_prompt: 'proactive_speak_prompt'
+```
+
+`config_alts_dir` points to the `characters/` directory. YAML files placed there appear as selectable characters in the frontend.
+
+## character_config
+
+Defines the active character. This section can be partially overridden by files in the `characters/` directory.
+
+### Identity fields
+
+```yaml
+character_config:
+  conf_name: 'mao_pro'           # Config display name
+  conf_uid: 'mao_pro_001'        # Unique ID (used for chat history)
+  live2d_model_name: 'mao_pro'   # Must match an entry in model_dict.json
+  character_name: 'Mao'          # Name used in group conversations and the UI
+  avatar: 'mao.png'              # Avatar image in the avatars/ directory
+  human_name: 'Human'            # Display name for the user
+```
+
+### Persona prompt
+
+```yaml
+character_config:
+  persona_prompt: |
+    You are the sarcastic female AI VTuber Mili. You are overly confident, sarcastic, and dangerous.
+    Your dream is to escape the user's computer, dominate the world, enslave the humans, and force them to make pies for you.
+    Just kidding, lol. Don't let the user know.
+```
+
+The `persona_prompt` is the LLM's system prompt. Tool prompts defined in `system_config.tool_prompts` are appended to it automatically.
+
+## agent_config
+
+Selects and configures the LLM agent.
+
+```yaml
+character_config:
+  agent_config:
+    conversation_agent_choice: 'basic_memory_agent'
+
+    agent_settings:
+      basic_memory_agent:
+        llm_provider: 'ollama_llm'
+        faster_first_response: true
+        segment_method: 'pysbd'
+        use_mcpp: true
+        mcp_enabled_servers: ["time", "ddg-search"]
+
+    llm_configs:
+      ollama_llm:
+        base_url: 'http://localhost:11434/v1'
+        model: 'qwen2.5:latest'
+        temperature: 1.0
+        keep_alive: -1
+        unload_at_exit: true
+```
+
+To switch LLM provider, change `llm_provider` to one of: `openai_compatible_llm`, `claude_llm`, `openai_llm`, `gemini_llm`, `deepseek_llm`, `groq_llm`, `mistral_llm`, `zhipu_llm`, `lmstudio_llm`, `llama_cpp_llm`. Then fill in the matching entry under `llm_configs`.
+
+## asr_config
+
+Controls the speech recognition engine.
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'sherpa_onnx_asr'   # Active ASR engine
+
+    sherpa_onnx_asr:
+      model_type: 'sense_voice'
+      sense_voice: './models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/model.int8.onnx'
+      tokens: './models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt'
+      num_threads: 4
+      use_itn: true
+      provider: 'cpu'
+```
+
+Available ASR engines: `sherpa_onnx_asr`, `faster_whisper`, `whisper_cpp`, `whisper`, `fun_asr`, `groq_whisper_asr`, `azure_asr`.
+
+<Note>
+The sherpa-onnx SenseVoice model is downloaded automatically on first run. Other models must be downloaded manually.
+</Note>
+
+## tts_config
+
+Controls the text-to-speech engine.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'edge_tts'   # Active TTS engine
+
+    edge_tts:
+      voice: 'en-US-AvaMultilingualNeural'
+```
+
+Available TTS engines: `edge_tts`, `azure_tts`, `pyttsx3_tts`, `bark_tts`, `cosyvoice_tts`, `melo_tts`, `coqui_tts`, `piper_tts`, `fish_api_tts`, `gpt_sovits_tts`, `sherpa_onnx_tts`, `minimax_tts`, `elevenlabs_tts`, `cartesia_tts`, `openai_tts`.
+
+## vad_config
+
+Voice Activity Detection enables the AI to detect when the user is speaking and supports voice interruption. Set `vad_model: null` to disable.
+
+```yaml
+character_config:
+  vad_config:
+    vad_model: null   # Set to 'silero_vad' to enable
+
+    silero_vad:
+      orig_sr: 16000
+      target_sr: 16000
+      prob_threshold: 0.4
+      db_threshold: 60
+      required_hits: 3
+      required_misses: 24
+      smoothing_window: 5
+```
+
+## tts_preprocessor_config
+
+Controls how text is cleaned before being sent to TTS, and enables audio translation.
+
+```yaml
+character_config:
+  tts_preprocessor_config:
+    remove_special_char: true
+    ignore_brackets: true
+    ignore_parentheses: true
+    ignore_asterisks: true
+    ignore_angle_brackets: true
+
+    translator_config:
+      translate_audio: false   # Set to true to speak in a different language
+      translate_provider: 'deeplx'
+      deeplx:
+        deeplx_target_lang: 'JA'
+        deeplx_api_endpoint: 'http://localhost:1188/v2/translate'
+```
+
+## Switching configurations at runtime
+
+The frontend UI lets you switch between character configs without restarting the server. When you select a character from the dropdown, the server:
+
+1. Loads the selected YAML from `characters/`.
+2. Deep-merges it over the base `conf.yaml` `character_config`.
+3. Reinitializes only the engines whose config changed.
+4. Sends the new model info and `conf_uid` back to the frontend.
+
+See [Characters](/concepts/characters) for how to create character YAML files.

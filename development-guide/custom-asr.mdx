@@ -1,0 +1,195 @@
+---
+title: Adding a custom ASR engine
+description: How to add a new automatic speech recognition backend by implementing ASRInterface and registering it in ASRFactory.
+---
+
+ASR engines in Open LLM VTuber receive raw audio as a NumPy array and return a transcription string. All backends implement the same `ASRInterface`, which makes them interchangeable through configuration.
+
+## The `ASRInterface`
+
+Defined at `src/open_llm_vtuber/asr/asr_interface.py`:
+
+```python asr_interface.py
+import abc
+import numpy as np
+import asyncio
+
+
+class ASRInterface(metaclass=abc.ABCMeta):
+    SAMPLE_RATE = 16000
+    NUM_CHANNELS = 1
+    SAMPLE_WIDTH = 2
+
+    async def async_transcribe_np(self, audio: np.ndarray) -> str:
+        """
+        Asynchronously transcribe speech audio in numpy array format.
+
+        By default, runs the synchronous transcribe_np in a thread.
+        Subclasses can override this for a native async implementation.
+        """
+        if audio.dtype != np.float32:
+            audio = audio.astype(np.float32)
+        return await asyncio.to_thread(self.transcribe_np, audio)
+
+    @abc.abstractmethod
+    def transcribe_np(self, audio: np.ndarray) -> str:
+        """
+        Transcribe speech audio in numpy array format.
+
+        Args:
+            audio: NumPy array of float32 audio data.
+
+        Returns:
+            str: The transcription result.
+        """
+        raise NotImplementedError
+```
+
+**You must implement `transcribe_np`.** The async wrapper `async_transcribe_np` is provided for you and runs your synchronous method in a thread pool. Override it if your library has a native async API.
+
+<Info>
+The expected audio format is:
+- Sample rate: 16 000 Hz
+- Channels: 1 (mono)
+- dtype: `np.float32` (values in the range `[-1.0, 1.0]`)
+</Info>
+
+## Real example: `sherpa_onnx_asr.py`
+
+The Sherpa-ONNX implementation (`src/open_llm_vtuber/asr/sherpa_onnx_asr.py`) is a good reference for how a complete ASR engine looks:
+
+```python sherpa_onnx_asr.py (excerpt)
+class VoiceRecognition(ASRInterface):
+    def __init__(
+        self,
+        model_type: str = "paraformer",
+        paraformer: str = None,
+        tokens: str = None,
+        num_threads: int = 1,
+        sample_rate: int = 16000,
+        provider: str = "cpu",
+        # ... many more model-type-specific parameters
+    ) -> None:
+        self.SAMPLE_RATE = sample_rate
+        # ... store all parameters ...
+        self.recognizer = self._create_recognizer()
+
+    def transcribe_np(self, audio: np.ndarray) -> str:
+        stream = self.recognizer.create_stream()
+        stream.accept_waveform(self.SAMPLE_RATE, audio)
+        self.recognizer.decode_streams([stream])
+        return stream.result.text
+```
+
+The pattern is: constructor sets up the engine, `transcribe_np` processes one audio array and returns a string.
+
+## Existing ASR backends
+
+| Provider key | Class | Notes |
+|---|---|---|
+| `sherpa_onnx_asr` | `VoiceRecognition` | Local offline, many model types |
+| `faster_whisper` | `VoiceRecognition` | Optimised Whisper, local |
+| `whisper` | `VoiceRecognition` | OpenAI Whisper, local |
+| `whisper_cpp` | `VoiceRecognition` | llama.cpp Whisper backend |
+| `fun_asr` | `VoiceRecognition` | FunASR, optimised for Chinese |
+| `azure_asr` | `VoiceRecognition` | Azure Cognitive Services |
+| `groq_whisper_asr` | `VoiceRecognition` | Whisper via Groq API |
+
+## Step-by-step: adding a new ASR engine
+
+<Steps>
+  <Step title="Create the implementation file">
+    Create a new file in `src/open_llm_vtuber/asr/`. The class name should be `VoiceRecognition` to match the existing convention.
+
+    ```python my_asr.py
+    import numpy as np
+    from loguru import logger
+    from .asr_interface import ASRInterface
+
+
+    class VoiceRecognition(ASRInterface):
+        def __init__(self, model_path: str, language: str = "en"):
+            self.language = language
+            logger.info(f"Loading ASR model from {model_path}")
+            # Initialize your model here
+            self.model = load_my_model(model_path)
+
+        def transcribe_np(self, audio: np.ndarray) -> str:
+            # audio is float32, mono, 16 kHz
+            result = self.model.transcribe(audio, language=self.language)
+            return result.text
+    ```
+
+    If your library has a native async API, also override `async_transcribe_np`:
+
+    ```python
+    async def async_transcribe_np(self, audio: np.ndarray) -> str:
+        if audio.dtype != np.float32:
+            audio = audio.astype(np.float32)
+        result = await self.model.atranscribe(audio)
+        return result.text
+    ```
+  </Step>
+
+  <Step title="Register in ASRFactory">
+    Open `src/open_llm_vtuber/asr/asr_factory.py` and add a new branch:
+
+    ```python asr_factory.py
+    class ASRFactory:
+        @staticmethod
+        def get_asr_system(system_name: str, **kwargs) -> Type[ASRInterface]:
+            # ... existing branches ...
+
+            elif system_name == "my_asr":
+                from .my_asr import VoiceRecognition as MyASR
+
+                return MyASR(
+                    model_path=kwargs.get("model_path"),
+                    language=kwargs.get("language", "en"),
+                )
+
+            else:
+                raise ValueError(f"Unknown ASR system: {system_name}")
+    ```
+  </Step>
+
+  <Step title="Add a configuration class">
+    Add a Pydantic config model in `src/open_llm_vtuber/config_manager/` (or in the existing ASR config file). Include all constructor parameters as typed fields with sensible defaults:
+
+    ```python config_manager/asr.py
+    class MyASRConfig(BaseModel):
+        model_path: str = "models/my-asr-model"
+        language: str = "en"
+    ```
+  </Step>
+
+  <Step title="Update the default configuration templates">
+    Add the new option to both YAML templates:
+
+    ```yaml conf.default.yaml
+    asr_config:
+      asr_model: my_asr
+      my_asr:
+        model_path: "models/my-asr-model"
+        language: "en"
+    ```
+  </Step>
+
+  <Step title="Test the integration">
+    Set `asr_model: my_asr` in `conf.yaml` and run:
+
+    ```bash
+    uv run run_server.py --verbose
+    ```
+
+    Speak into the microphone and verify the transcription appears in the logs.
+  </Step>
+</Steps>
+
+## Helper utility: `nparray_to_audio_file`
+
+`ASRInterface` includes a helper you can call during debugging to dump the audio to a `.wav` file and listen to what the engine is receiving:
+
+```python
+self.nparray_to_audio_file(audio, sample_rate=16000, file_path="debug.wav")
+```

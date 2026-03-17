@@ -1,0 +1,146 @@
+---
+title: 'TTS overview'
+description: 'Text-to-speech engine options in Open LLM VTuber, text preprocessing settings, and audio translation.'
+---
+
+Open LLM VTuber supports many TTS backends. The active engine is set by `tts_model` inside `character_config.tts_config`.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'edge_tts'
+```
+
+## Supported engines
+
+| Engine key | Type | Language support | Voice cloning | Notes |
+|---|---|---|---|---|
+| `edge_tts` | Cloud | 100+ | No | Default. Free Microsoft Edge TTS. |
+| `azure_tts` | Cloud | 140+ | No | High quality; requires Azure subscription. |
+| `fish_api_tts` | Cloud | Multi | Yes | Fish Audio API with reference voice. |
+| `elevenlabs_tts` | Cloud | Multi | Yes | ElevenLabs AI voices. |
+| `cartesia_tts` | Cloud | Multi | No | Cartesia Sonic models. |
+| `minimax_tts` | Cloud | Multi | No | MiniMax speech API. |
+| `siliconflow_tts` | Cloud | Multi | Yes | SiliconFlow CosyVoice2 API. |
+| `sherpa_onnx_tts` | Offline | Model-dependent | No | Fully offline VITS/ONNX models. |
+| `piper_tts` | Offline | 30+ | No | Fast, lightweight offline TTS. |
+| `melo_tts` | Offline | EN, ZH | No | MeloTTS local model. |
+| `bark_tts` | Offline | Multi | No | Suno Bark; expressive but slow. |
+| `coqui_tts` | Offline | Multi | Yes | Coqui TTS; supports XTTS voice cloning. |
+| `cosyvoice_tts` | Local API | Multi | Yes | CosyVoice via Gradio WebUI. |
+| `cosyvoice2_tts` | Local API | Multi | Yes | CosyVoice 2 via Gradio WebUI. |
+| `gpt_sovits_tts` | Local API | zh, en, ja | Yes | GPT-SoVITS via local API server. |
+| `spark_tts` | Local API | Multi | Yes | SparkAudio Spark-TTS via Gradio. |
+| `openai_tts` | Local API | Model-dependent | No | Any OpenAI-compatible TTS endpoint (e.g., Kokoro). |
+| `pyttsx3_tts` | Offline | System voices | No | System TTS; no config required. |
+| `x_tts` | Local API | Multi | Yes | Coqui XTTS via local API server. |
+
+## Text preprocessing
+
+Before text is sent to the TTS engine, it passes through the `tts_preprocessor_config` pipeline. This removes characters that would be spoken literally — like asterisks in action text or emoji — and are better left silent.
+
+```yaml
+character_config:
+  tts_preprocessor_config:
+    remove_special_char: true   # Remove emoji and other special characters
+    ignore_brackets: true       # Skip text inside [ ]
+    ignore_parentheses: true    # Skip text inside ( )
+    ignore_asterisks: true      # Skip text wrapped in * *
+    ignore_angle_brackets: true # Skip text wrapped in < >
+```
+
+<ParamField path="remove_special_char" type="boolean" default="true">
+  Strips emoji and non-alphanumeric special characters before synthesis.
+</ParamField>
+
+<ParamField path="ignore_brackets" type="boolean" default="true">
+  Text inside square brackets `[like this]` is not spoken. Useful for suppressing action descriptions or metadata.
+</ParamField>
+
+<ParamField path="ignore_parentheses" type="boolean" default="true">
+  Text inside parentheses `(like this)` is not spoken.
+</ParamField>
+
+<ParamField path="ignore_asterisks" type="boolean" default="true">
+  Text wrapped in asterisks `*like this*` is not spoken. Common in roleplay-style LLM outputs.
+</ParamField>
+
+<ParamField path="ignore_angle_brackets" type="boolean" default="true">
+  Text wrapped in angle brackets `<like this>` is not spoken.
+</ParamField>
+
+## Audio translation
+
+The translator lets the AI speak in a different language from what it reads and displays. For example: the AI responds in English subtitles, but the TTS speaks in Japanese.
+
+```yaml
+character_config:
+  tts_preprocessor_config:
+    translator_config:
+      translate_audio: false
+      translate_provider: 'deeplx'   # 'deeplx' or 'tencent'
+
+      deeplx:
+        deeplx_target_lang: 'JA'
+        deeplx_api_endpoint: 'http://localhost:1188/v2/translate'
+
+      tencent:
+        secret_id: ''
+        secret_key: ''
+        region: 'ap-guangzhou'
+        source_lang: 'zh'
+        target_lang: 'ja'
+```
+
+<ParamField path="translate_audio" type="boolean" default="false">
+  When `true`, the TTS text is translated before synthesis. The displayed subtitles remain in the original language.
+</ParamField>
+
+<ParamField path="translate_provider" type="string" default="deeplx">
+  Translation backend. `deeplx` requires a locally running DeeplX server. `tencent` uses the Tencent Machine Translation API.
+</ParamField>
+
+<Warning>
+Setting `translate_audio: true` without a running DeeplX or Tencent translation service will cause the server to crash on the first TTS call.
+</Warning>
+
+### DeeplX setup
+
+DeeplX is a free, self-hosted proxy for DeepL translation. Run it locally before enabling `translate_audio`.
+
+```yaml
+deeplx:
+  deeplx_target_lang: 'JA'                            # Target language code
+  deeplx_api_endpoint: 'http://localhost:1188/v2/translate'
+```
+
+### Tencent translation setup
+
+The Tencent API provides 5 million free characters per month.
+
+```yaml
+tencent:
+  secret_id: 'your-tencent-secret-id'
+  secret_key: 'your-tencent-secret-key'
+  region: 'ap-guangzhou'
+  source_lang: 'zh'
+  target_lang: 'ja'
+```
+
+<Note>
+To prevent unexpected charges, disable post-payment in the Tencent Machine Translation Console under **System Settings** after setting up your credentials.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Edge TTS" icon="cloud" href="/user-guide/tts/edge-tts">
+    Configure the default cloud TTS engine.
+  </Card>
+  <Card title="Local TTS" icon="microchip" href="/user-guide/tts/local-tts">
+    Offline TTS engines: sherpa_onnx, Piper, MeloTTS, and more.
+  </Card>
+  <Card title="Cloud TTS" icon="globe" href="/user-guide/tts/cloud-tts">
+    Azure, ElevenLabs, Fish Audio, Cartesia, MiniMax, and SiliconFlow.
+  </Card>
+</CardGroup>

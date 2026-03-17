@@ -1,0 +1,68 @@
+---
+title: 'Visual perception'
+description: 'Let the AI see your camera feed, screen, or screenshots using vision-capable LLMs.'
+---
+
+Open LLM VTuber can give the AI access to visual input — a webcam feed, screen recording, or manual screenshots. This enables the AI to see and comment on what is happening on your screen or in front of your camera.
+
+## Requirements
+
+Visual perception requires a vision-capable LLM. The following providers support image input:
+
+- **OpenAI**: `gpt-4o`, `gpt-4o-mini`, `gpt-4-vision-preview`
+- **Anthropic**: `claude-3-haiku-20240307`, `claude-3-5-sonnet-20241022`, and other Claude 3+ models
+- **Google**: `gemini-2.0-flash-exp`, `gemini-1.5-pro`, and other Gemini multimodal models
+- **Ollama**: Vision-capable local models such as `llava`, `bakllava`, `moondream`
+- **OpenAI-compatible**: Any endpoint that accepts the OpenAI image input format
+
+<Warning>
+If you enable visual perception with an LLM that does not support image input, the server will return an error when it tries to send image data.
+</Warning>
+
+## Enabling visual perception
+
+Visual perception is controlled from the frontend UI, not from `conf.yaml`. No server-side configuration is required.
+
+<Steps>
+  <Step title="Start the server">
+    ```bash
+    uv run run_server.py
+    ```
+  </Step>
+  <Step title="Open the frontend">
+    Navigate to `http://localhost:12393` in your browser.
+  </Step>
+  <Step title="Configure your LLM">
+    Ensure the active LLM in `conf.yaml` is a vision-capable model (see the list above).
+  </Step>
+  <Step title="Enable visual input in the UI">
+    In the frontend settings panel, enable the camera, screen capture, or screenshot option. The frontend will prompt for the appropriate browser permission.
+  </Step>
+</Steps>
+
+## What the AI can observe
+
+Depending on the input source you enable:
+
+- **Camera**: The AI sees your face and environment in real time.
+- **Screen capture**: The AI sees your active screen or a specific window.
+- **Screenshot**: The AI receives a single snapshot when you trigger it.
+
+The AI can respond to visual context naturally in conversation. For example:
+
+- Describing what it sees in your camera
+- Reading and commenting on content visible on screen
+- Helping debug visible errors in your code editor
+- Reacting to games or videos you are watching
+
+## Privacy
+
+<Warning>
+When visual perception is active, images from your camera or screen are sent to the LLM provider as part of the conversation payload. For cloud providers (OpenAI, Anthropic, Google), this means image data leaves your machine. Use a local model via Ollama if you need to keep visual input private.
+</Warning>
+
+## Tips
+
+- For webcam input, ensure your camera is not in use by another application.
+- Screen capture accuracy improves when you have good lighting and high display contrast.
+- Some local vision models (e.g., `moondream`) are faster but less accurate than larger models like `llava:13b`.

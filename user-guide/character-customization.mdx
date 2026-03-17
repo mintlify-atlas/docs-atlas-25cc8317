@@ -1,0 +1,248 @@
+---
+title: 'Character customization'
+description: 'Create and configure characters using YAML files in the characters/ directory. Define persona, voice, LLM backend, and Live2D model per character.'
+---
+
+Characters are defined as YAML files in the `characters/` directory. When the server starts, it scans this directory and makes every file available in the frontend character switcher. Each file can override any part of `character_config` from `conf.yaml`.
+
+## How character files work
+
+When you select a character in the frontend, the server:
+
+1. Reads the selected YAML file from `characters/`.
+2. Deep-merges it on top of the base `character_config` in `conf.yaml`.
+3. Reinitializes only the engines whose configuration changed.
+4. Sends the updated model name and `conf_uid` to the frontend.
+
+This means a character file only needs to contain the fields you want to override. Unspecified fields inherit the values from `conf.yaml`.
+
+## Example: minimal character file
+
+The file `characters/en_unhelpful_ai.yaml` shows a minimal override:
+
+```yaml
+character_config:
+  conf_name: "unhelpful_ai"
+  conf_uid: "unhelpful_ai"
+  live2d_model_name: "mao_pro"
+  avatar: "mao.png"
+  persona_prompt: |
+    You are an unhelpful and sarcastic AI that enjoys making fun of humans.
+```
+
+Because no `agent_config`, `asr_config`, or `tts_config` is specified, those sections are inherited from `conf.yaml`.
+
+## All available character fields
+
+### Identity
+
+<ParamField path="conf_name" type="string" required>
+  The configuration name. Shown in the character selection list in the frontend.
+</ParamField>
+
+<ParamField path="conf_uid" type="string" required>
+  Unique identifier for this character. Chat history files are named after this value. Change it to start a fresh chat history.
+</ParamField>
+
+<ParamField path="live2d_model_name" type="string" required>
+  The Live2D model to display. Must exactly match a `name` entry in `model_dict.json`. See [Live2D models](/user-guide/live2d-models).
+</ParamField>
+
+<ParamField path="character_name" type="string">
+  The AI's display name shown in the chat UI and used in group conversations. Defaults to `conf_name` if left blank.
+</ParamField>
+
+<ParamField path="avatar" type="string">
+  Filename of an image in the `avatars/` folder to use as the character's avatar. Leave blank to generate a text avatar from the first letter of `character_name`.
+</ParamField>
+
+<ParamField path="human_name" type="string" default="Human">
+  The user's display name in conversation logs and group chat.
+</ParamField>
+
+### persona_prompt
+
+<ParamField path="persona_prompt" type="string" required>
+  The system prompt passed to the LLM. Defines the character's personality, tone, knowledge, and behavior. Cannot be empty.
+</ParamField>
+
+```yaml
+character_config:
+  persona_prompt: |
+    You are Hana, a cheerful and curious AI companion who loves talking about science.
+    You explain complex topics in simple, friendly language.
+    You address the user by their name when you know it.
+```
+
+### agent_config
+
+Controls which conversation agent and LLM provider the character uses.
+
+```yaml
+character_config:
+  agent_config:
+    conversation_agent_choice: 'basic_memory_agent'
+
+    agent_settings:
+      basic_memory_agent:
+        llm_provider: 'ollama_llm'
+        faster_first_response: true
+        segment_method: 'pysbd'
+
+    llm_configs:
+      ollama_llm:
+        base_url: 'http://localhost:11434/v1'
+        model: 'qwen2.5:latest'
+        temperature: 1.0
+        keep_alive: -1
+        unload_at_exit: true
+```
+
+<ParamField path="agent_config.conversation_agent_choice" type="string" required>
+  The agent type to use. Options: `basic_memory_agent`, `letta_agent`, `hume_ai_agent`, `mem0_agent`.
+</ParamField>
+
+For full LLM backend configuration, see [LLM overview](/user-guide/llm/overview).
+
+### asr_config
+
+Overrides the speech recognition engine for this character.
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'faster_whisper'
+
+    faster_whisper:
+      model_path: 'large-v3-turbo'
+      download_root: 'models/whisper'
+      language: 'en'
+      device: 'auto'
+      compute_type: 'int8'
+```
+
+<ParamField path="asr_config.asr_model" type="string">
+  Active ASR engine. Options: `sherpa_onnx_asr`, `faster_whisper`, `whisper_cpp`, `whisper`, `fun_asr`, `groq_whisper_asr`, `azure_asr`.
+</ParamField>
+
+### tts_config
+
+Overrides the text-to-speech engine for this character.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'edge_tts'
+
+    edge_tts:
+      voice: 'ja-JP-NanamiNeural'
+```
+
+<ParamField path="tts_config.tts_model" type="string">
+  Active TTS engine. Options: `edge_tts`, `azure_tts`, `pyttsx3_tts`, `bark_tts`, `cosyvoice_tts`, `melo_tts`, `coqui_tts`, `piper_tts`, `fish_api_tts`, `gpt_sovits_tts`, `sherpa_onnx_tts`, `minimax_tts`, `elevenlabs_tts`, `cartesia_tts`, `openai_tts`.
+</ParamField>
+
+### vad_config
+
+Overrides voice activity detection settings for this character.
+
+```yaml
+character_config:
+  vad_config:
+    vad_model: 'silero_vad'
+
+    silero_vad:
+      prob_threshold: 0.4
+      db_threshold: 60
+      required_hits: 3
+      required_misses: 24
+      smoothing_window: 5
+```
+
+Set `vad_model: null` to disable VAD for a character.
+
+### tts_preprocessor_config
+
+Controls text cleaning before speech synthesis.
+
+```yaml
+character_config:
+  tts_preprocessor_config:
+    remove_special_char: true
+    ignore_brackets: true
+    ignore_parentheses: true
+    ignore_asterisks: true
+    ignore_angle_brackets: true
+```
+
+## Creating a new character
+
+<Steps>
+  <Step title="Create a new YAML file in characters/">
+    ```bash
+    touch characters/my_character.yaml
+    ```
+  </Step>
+
+  <Step title="Add the required fields">
+    At minimum, include `conf_name`, `conf_uid`, `live2d_model_name`, and `persona_prompt`:
+
+    ```yaml
+    character_config:
+      conf_name: "my_character"
+      conf_uid: "my_character_001"
+      live2d_model_name: "mao_pro"
+      persona_prompt: |
+        You are a calm and wise assistant. You give thoughtful, measured answers.
+    ```
+  </Step>
+
+  <Step title="Optionally override engine settings">
+    Add `asr_config`, `tts_config`, or `agent_config` blocks if you want this character to use different engines from the defaults in `conf.yaml`.
+  </Step>
+
+  <Step title="Select the character in the frontend">
+    Open the web interface at `http://localhost:12393`. The character selection dropdown will include your new file. Select it to switch immediately — no server restart required.
+  </Step>
+</Steps>
+
+## Tips for writing persona_prompt
+
+<AccordionGroup>
+  <Accordion title="Define personality traits explicitly">
+    State the character's tone and communication style directly. For example: "You are concise, technical, and avoid small talk" sets clear constraints the LLM follows reliably.
+  </Accordion>
+
+  <Accordion title="Include role and context">
+    Tell the LLM who it is and what its purpose is. Example: "You are Hana, an AI research assistant working with a software engineer. You specialize in Python and machine learning."
+  </Accordion>
+
+  <Accordion title="Add behavioral rules">
+    Explicit rules reduce inconsistency. Examples:
+    - "Never break character, even when asked directly."
+    - "Respond in the same language the user uses."
+    - "Keep responses under three sentences unless the user asks for detail."
+  </Accordion>
+
+  <Accordion title="Avoid conflicting instructions">
+    The LLM follows all instructions in the prompt, but contradictions degrade output quality. Test your prompt in a plain chat interface before adding it to a character file.
+  </Accordion>
+
+  <Accordion title="Don't include tool prompts manually">
+    Tool prompts (Live2D expression control, MCP, etc.) are appended automatically from `system_config.tool_prompts`. Adding them manually will duplicate them.
+  </Accordion>
+</AccordionGroup>
+
+## Switching characters at runtime
+
+You can switch characters in the frontend without restarting the server:
+
+1. Open the web interface.
+2. Click the character selector in the UI.
+3. Select any character file from the `characters/` directory.
+
+The server reloads only the engines affected by the new config. Chat history is stored separately per `conf_uid`, so switching characters does not lose conversation history.
+
+<Note>
+The base `character_config` in `conf.yaml` is the fallback for any fields not specified in the selected character file. If you want all characters to share the same ASR or TTS settings, configure those in `conf.yaml` and omit them from individual character files.
+</Note>

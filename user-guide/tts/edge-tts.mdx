@@ -1,0 +1,103 @@
+---
+title: 'Edge TTS'
+description: 'Configure the default Edge TTS engine — choosing voices and language options.'
+---
+
+Edge TTS is the default TTS engine. It uses Microsoft Edge's neural TTS service, which is free and supports over 100 languages and 300+ voices.
+
+<Warning>
+Edge TTS requires an internet connection. It may be unavailable or blocked in some regions.
+</Warning>
+
+## Configuration
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'edge_tts'
+
+    edge_tts:
+      voice: 'en-US-AvaMultilingualNeural'
+```
+
+The only setting is `voice`. Change this to any voice name from the Edge TTS voice list.
+
+## Listing available voices
+
+Run the following command to see all available voices:
+
+```bash
+edge-tts --list-voices
+```
+
+This outputs a table of voice names, locales, and genders. The `ShortName` column is the value to use in `conf.yaml`.
+
+## Popular voices
+
+<Tabs>
+  <Tab title="English">
+    | Voice name | Description |
+    |---|---|
+    | `en-US-AvaMultilingualNeural` | US English, female, multilingual-capable (default) |
+    | `en-US-EmmaMultilingualNeural` | US English, female, multilingual-capable |
+    | `en-US-JennyNeural` | US English, female, conversational |
+    | `en-US-GuyNeural` | US English, male, conversational |
+    | `en-GB-SoniaNeural` | UK English, female |
+    | `en-AU-NatashaNeural` | Australian English, female |
+  </Tab>
+  <Tab title="Chinese">
+    | Voice name | Description |
+    |---|---|
+    | `zh-CN-XiaoxiaoNeural` | Mandarin Chinese, female, warm |
+    | `zh-CN-YunxiNeural` | Mandarin Chinese, male |
+    | `zh-CN-XiaoyiNeural` | Mandarin Chinese, female, lively |
+    | `zh-TW-HsiaoChenNeural` | Traditional Chinese, female |
+  </Tab>
+  <Tab title="Japanese">
+    | Voice name | Description |
+    |---|---|
+    | `ja-JP-NanamiNeural` | Japanese, female |
+    | `ja-JP-KeitaNeural` | Japanese, male |
+    | `ja-JP-AoiNeural` | Japanese, female, friendly |
+  </Tab>
+  <Tab title="Korean">
+    | Voice name | Description |
+    |---|---|
+    | `ko-KR-SunHiNeural` | Korean, female |
+    | `ko-KR-InJoonNeural` | Korean, male |
+  </Tab>
+</Tabs>
+
+## Changing the voice
+
+<Steps>
+  <Step title="Find a voice name">
+    Run `edge-tts --list-voices` and copy the `ShortName` of the voice you want.
+  </Step>
+  <Step title="Update conf.yaml">
+    ```yaml
+    edge_tts:
+      voice: 'ja-JP-NanamiNeural'
+    ```
+  </Step>
+  <Step title="Restart the server">
+    ```bash
+    uv run run_server.py
+    ```
+  </Step>
+</Steps>
+
+## Testing a voice before committing
+
+You can preview a voice from the command line without starting the server:
+
+```bash
+edge-tts --voice en-US-AvaMultilingualNeural --text "Hello, I am your AI companion." --write-media preview.mp3
+```
+
+## Switching away from Edge TTS
+
+If you need an offline TTS engine or want more control over voice characteristics, see:
+
+- [Local TTS](/user-guide/tts/local-tts) — Offline options including Piper, sherpa_onnx, and MeloTTS
+- [Cloud TTS](/user-guide/tts/cloud-tts) — Higher-quality cloud options including Azure TTS and ElevenLabs

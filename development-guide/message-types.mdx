@@ -1,0 +1,481 @@
+---
+title: Message types
+description: Complete reference for all WebSocket message types in Open LLM VTuber, grouped by category with payload field documentation.
+---
+
+All WebSocket messages are JSON objects with a `type` field. This page documents every message type, its direction, and its payload.
+
+**Direction key:**
+- **C→S** — sent by the client (browser / desktop app) to the server
+- **S→C** — sent by the server to the client
+
+---
+
+## Audio messages
+
+### `mic-audio-data` (C→S)
+
+Chunked microphone audio captured by the client. The server buffers these chunks in memory until `mic-audio-end` is received.
+
+<ParamField body="type" type="string" required>
+  `"mic-audio-data"`
+</ParamField>
+
+<ParamField body="audio" type="number[]" required>
+  Array of float32 audio samples (mono, 16 kHz, range `[-1.0, 1.0]`).
+</ParamField>
+
+---
+
+### `raw-audio-data` (C→S)
+
+Raw audio data for VAD (voice activity detection) mode. The server runs the VAD engine on each chunk and automatically triggers transcription when speech ends.
+
+<ParamField body="type" type="string" required>
+  `"raw-audio-data"`
+</ParamField>
+
+<ParamField body="audio" type="number[]" required>
+  Array of audio samples for VAD processing.
+</ParamField>
+
+---
+
+### `audio-play-request` (S→C)
+
+Tells the client to play a generated audio file.
+
+<ParamField body="type" type="string" required>
+  `"audio-play-request"`
+</ParamField>
+
+<ParamField body="audio" type="string">
+  URL or path to the audio file to play.
+</ParamField>
+
+<ParamField body="display_text" type="object">
+  Text to display alongside playback. Contains `text`, `name`, and `avatar` fields.
+</ParamField>
+
+<ParamField body="actions" type="object">
+  Live2D actions to execute during playback. Contains `expressions`, `pictures`, and `sounds` arrays.
+</ParamField>
+
+---
+
+### `audio-play-start` (C→S)
+
+Notifies the server that the client has started playing an audio segment. In group mode, the server forwards the `display_text` to other group members as a silent display update.
+
+<ParamField body="type" type="string" required>
+  `"audio-play-start"`
+</ParamField>
+
+<ParamField body="display_text" type="object">
+  The display text object from the audio payload being played.
+</ParamField>
+
+---
+
+### `backend-synth-done` (S→C)
+
+Signals that the server has finished generating all audio for the current response. The client uses this to know when it can re-enable the microphone.
+
+<ParamField body="type" type="string" required>
+  `"backend-synth-done"`
+</ParamField>
+
+---
+
+## Conversation messages
+
+### `mic-audio-end` (C→S)
+
+Tells the server that audio capture is complete and it should run ASR on the buffered audio, then start the conversation pipeline.
+
+<ParamField body="type" type="string" required>
+  `"mic-audio-end"`
+</ParamField>
+
+<ParamField body="images" type="string[]">
+  Optional list of base64-encoded images for visual perception input.
+</ParamField>
+
+---
+
+### `text-input` (C→S)
+
+Send a text message directly, bypassing ASR.
+
+<ParamField body="type" type="string" required>
+  `"text-input"`
+</ParamField>
+
+<ParamField body="text" type="string" required>
+  The user's text message.
+</ParamField>
+
+<ParamField body="images" type="string[]">
+  Optional list of base64-encoded images.
+</ParamField>
+
+---
+
+### `ai-speak-signal` (C→S)
+
+Triggers the AI to speak proactively without any user input. Used for automated or scheduled utterances.
+
+<ParamField body="type" type="string" required>
+  `"ai-speak-signal"`
+</ParamField>
+
+<ParamField body="text" type="string">
+  Optional text to inject as if the user said it.
+</ParamField>
+
+---
+
+### `full-text` (S→C)
+
+A complete text string for display in the UI. Used for transcriptions, AI responses, and status messages.
+
+<ParamField body="type" type="string" required>
+  `"full-text"`
+</ParamField>
+
+<ParamField body="text" type="string" required>
+  The text content to display.
+</ParamField>
+
+---
+
+### `interrupt-signal` (C→S)
+
+Tells the server to stop the current AI response.
+
+<ParamField body="type" type="string" required>
+  `"interrupt-signal"`
+</ParamField>
+
+<ParamField body="text" type="string">
+  The portion of the AI response the client had already played before interrupting.
+</ParamField>
+
+---
+
+## Configuration messages
+
+### `fetch-configs` (C→S)
+
+Requests the list of available character configuration files.
+
+<ParamField body="type" type="string" required>
+  `"fetch-configs"`
+</ParamField>
+
+---
+
+### `config-files` (S→C)
+
+Returns the available configuration files.
+
+<ParamField body="type" type="string" required>
+  `"config-files"`
+</ParamField>
+
+<ParamField body="configs" type="string[]" required>
+  List of config file names found in the `config_alts_dir` directory.
+</ParamField>
+
+---
+
+### `switch-config` (C→S)
+
+Requests a configuration switch to a different character.
+
+<ParamField body="type" type="string" required>
+  `"switch-config"`
+</ParamField>
+
+<ParamField body="file" type="string" required>
+  The config file name to switch to (e.g., `"my_character.yaml"` or `"conf.yaml"` for the base config).
+</ParamField>
+
+---
+
+### `config-switched` (S→C)
+
+Confirms a successful configuration switch.
+
+<ParamField body="type" type="string" required>
+  `"config-switched"`
+</ParamField>
+
+<ParamField body="message" type="string" required>
+  Human-readable confirmation message.
+</ParamField>
+
+---
+
+### `set-model-and-conf` (S→C)
+
+Sent on connection and after a config switch. Tells the client which Live2D model and character config are active.
+
+<ParamField body="type" type="string" required>
+  `"set-model-and-conf"`
+</ParamField>
+
+<ParamField body="model_info" type="object" required>
+  Live2D model metadata object.
+</ParamField>
+
+<ParamField body="conf_name" type="string" required>
+  Human-readable configuration name.
+</ParamField>
+
+<ParamField body="conf_uid" type="string" required>
+  Unique identifier for the active configuration.
+</ParamField>
+
+<ParamField body="client_uid" type="string">
+  The session UUID assigned to this client (only sent on initial connection).
+</ParamField>
+
+---
+
+### `request-init-config` (C→S)
+
+Requests the current model and config state (useful after a page reload).
+
+<ParamField body="type" type="string" required>
+  `"request-init-config"`
+</ParamField>
+
+---
+
+### `fetch-backgrounds` (C→S)
+
+Requests the list of available background images.
+
+<ParamField body="type" type="string" required>
+  `"fetch-backgrounds"`
+</ParamField>
+
+---
+
+### `background-files` (S→C)
+
+<ParamField body="type" type="string" required>
+  `"background-files"`
+</ParamField>
+
+<ParamField body="files" type="string[]" required>
+  List of background image file paths.
+</ParamField>
+
+---
+
+## History messages
+
+### `fetch-history-list` (C→S)
+
+Requests the list of saved conversation histories for the current character.
+
+<ParamField body="type" type="string" required>
+  `"fetch-history-list"`
+</ParamField>
+
+---
+
+### `history-list` (S→C)
+
+<ParamField body="type" type="string" required>
+  `"history-list"`
+</ParamField>
+
+<ParamField body="histories" type="object[]" required>
+  Array of history metadata objects.
+</ParamField>
+
+---
+
+### `fetch-and-set-history` (C→S)
+
+Loads a specific conversation history into the active agent's memory.
+
+<ParamField body="type" type="string" required>
+  `"fetch-and-set-history"`
+</ParamField>
+
+<ParamField body="history_uid" type="string" required>
+  The unique identifier of the history to load.
+</ParamField>
+
+---
+
+### `history-data` (S→C)
+
+<ParamField body="type" type="string" required>
+  `"history-data"`
+</ParamField>
+
+<ParamField body="messages" type="object[]" required>
+  Array of message objects (`role`, `content`) excluding system messages.
+</ParamField>
+
+---
+
+### `create-new-history` (C→S)
+
+Creates a new, empty conversation history for the current character.
+
+<ParamField body="type" type="string" required>
+  `"create-new-history"`
+</ParamField>
+
+---
+
+### `new-history-created` (S→C)
+
+<ParamField body="type" type="string" required>
+  `"new-history-created"`
+</ParamField>
+
+<ParamField body="history_uid" type="string" required>
+  The UID of the newly created history.
+</ParamField>
+
+---
+
+### `delete-history` (C→S)
+
+<ParamField body="type" type="string" required>
+  `"delete-history"`
+</ParamField>
+
+<ParamField body="history_uid" type="string" required>
+  The UID of the history to delete.
+</ParamField>
+
+---
+
+### `history-deleted` (S→C)
+
+<ParamField body="type" type="string" required>
+  `"history-deleted"`
+</ParamField>
+
+<ParamField body="success" type="boolean" required>
+  Whether the deletion was successful.
+</ParamField>
+
+<ParamField body="history_uid" type="string" required>
+  The UID of the deleted history.
+</ParamField>
+
+---
+
+## Group messages
+
+### `add-client-to-group` (C→S)
+
+Invites another connected client into a shared conversation group.
+
+<ParamField body="type" type="string" required>
+  `"add-client-to-group"`
+</ParamField>
+
+<ParamField body="invitee_uid" type="string" required>
+  The `client_uid` of the client to invite.
+</ParamField>
+
+---
+
+### `remove-client-from-group` (C→S)
+
+<ParamField body="type" type="string" required>
+  `"remove-client-from-group"`
+</ParamField>
+
+<ParamField body="target_uid" type="string" required>
+  The `client_uid` of the client to remove.
+</ParamField>
+
+---
+
+### `request-group-info` (C→S)
+
+Requests current group membership information.
+
+<ParamField body="type" type="string" required>
+  `"request-group-info"`
+</ParamField>
+
+---
+
+### `group-update` (S→C)
+
+Broadcast whenever group membership changes.
+
+<ParamField body="type" type="string" required>
+  `"group-update"`
+</ParamField>
+
+<ParamField body="members" type="string[]" required>
+  List of `client_uid` values currently in the group.
+</ParamField>
+
+<ParamField body="is_owner" type="boolean" required>
+  Whether the receiving client is the group owner.
+</ParamField>
+
+---
+
+## System messages
+
+### `control` (S→C)
+
+Server-sent control commands for the frontend.
+
+<ParamField body="type" type="string" required>
+  `"control"`
+</ParamField>
+
+<ParamField body="text" type="string" required>
+  The control command. Known values:
+  - `"start-mic"` — start microphone capture
+  - `"interrupt"` — stop current playback
+  - `"mic-audio-end"` — VAD detected end of speech
+</ParamField>
+
+---
+
+### `error` (S→C)
+
+<ParamField body="type" type="string" required>
+  `"error"`
+</ParamField>
+
+<ParamField body="message" type="string" required>
+  Human-readable error description.
+</ParamField>
+
+---
+
+### `heartbeat` (C→S)
+
+Keep-alive ping from the client.
+
+<ParamField body="type" type="string" required>
+  `"heartbeat"`
+</ParamField>
+
+---
+
+### `heartbeat-ack` (S→C)
+
+Heartbeat acknowledgement from the server.
+
+<ParamField body="type" type="string" required>
+  `"heartbeat-ack"`
+</ParamField>

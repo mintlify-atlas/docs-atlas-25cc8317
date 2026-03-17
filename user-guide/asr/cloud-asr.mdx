@@ -1,0 +1,106 @@
+---
+title: 'Cloud ASR'
+description: 'Configure Groq Whisper and Azure Speech Service for cloud-based speech recognition.'
+---
+
+Cloud ASR backends offload transcription to external services. They require an internet connection and API credentials but need no local GPU or model downloads.
+
+## Groq Whisper
+
+Groq runs Whisper on dedicated LPU hardware. It is extremely fast and available on a free tier.
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'groq_whisper_asr'
+
+    groq_whisper_asr:
+      api_key: 'your-groq-api-key'
+      model: 'whisper-large-v3-turbo'   # or 'whisper-large-v3'
+      lang: ''                           # Language code, or leave blank for auto-detect
+```
+
+<Steps>
+  <Step title="Get a Groq API key">
+    Sign up at `https://console.groq.com` and create a free API key.
+  </Step>
+  <Step title="Set the API key">
+    Paste the key into `api_key` in `conf.yaml`.
+  </Step>
+  <Step title="Set asr_model">
+    ```yaml
+    asr_model: 'groq_whisper_asr'
+    ```
+  </Step>
+</Steps>
+
+### Parameter reference
+
+<ParamField path="api_key" type="string" required>
+  Your Groq API key.
+</ParamField>
+
+<ParamField path="model" type="string" default="whisper-large-v3-turbo">
+  Whisper model to use on Groq. `whisper-large-v3-turbo` is faster; `whisper-large-v3` is marginally more accurate.
+</ParamField>
+
+<ParamField path="lang" type="string">
+  BCP-47 language code (e.g., `en`, `zh`, `ja`). Leave blank for automatic language detection.
+</ParamField>
+
+## Azure Speech Service
+
+Microsoft Azure Speech Service supports over 100 languages and can detect multiple languages simultaneously in the same audio stream.
+
+```yaml
+character_config:
+  asr_config:
+    asr_model: 'azure_asr'
+
+    azure_asr:
+      api_key: 'your-azure-speech-api-key'
+      region: 'eastus'
+      languages:
+        - 'en-US'
+        - 'zh-CN'
+```
+
+<Steps>
+  <Step title="Create an Azure Speech resource">
+    In the Azure portal, create a Speech Service resource and copy the key and region.
+  </Step>
+  <Step title="Set credentials">
+    Add `api_key` and `region` to the `azure_asr` block in `conf.yaml`.
+  </Step>
+  <Step title="Configure languages">
+    List all languages you want detected under `languages`. Azure will identify which language is being spoken automatically.
+  </Step>
+</Steps>
+
+### Parameter reference
+
+<ParamField path="api_key" type="string" required>
+  Your Azure Speech Service subscription key.
+</ParamField>
+
+<ParamField path="region" type="string" required>
+  Azure region of your Speech resource (e.g., `eastus`, `westeurope`, `japaneast`).
+</ParamField>
+
+<ParamField path="languages" type="array" default="['en-US', 'zh-CN']">
+  List of BCP-47 language codes for multi-language detection. Azure will detect which language in the list is being spoken for each utterance.
+</ParamField>
+
+## When to use cloud vs local
+
+| Situation | Recommendation |
+|---|---|
+| No internet required | `sherpa_onnx_asr` or `faster_whisper` |
+| Fastest possible transcription | `groq_whisper_asr` |
+| Multiple languages in one conversation | `azure_asr` |
+| Low-end hardware, want good quality | `groq_whisper_asr` |
+| Data privacy concerns | Any offline backend |
+
+<Warning>
+Cloud ASR backends send audio data to external servers. Do not use them in environments where audio privacy is required.
+</Warning>

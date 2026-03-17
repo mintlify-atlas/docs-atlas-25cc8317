@@ -1,0 +1,136 @@
+---
+title: 'Characters'
+description: 'How to create and manage multiple character configurations using YAML files in the characters/ directory.'
+---
+
+Open-LLM-VTuber supports multiple AI personas through character configuration files. Each character is a YAML file in the `characters/` directory. Characters appear in the frontend dropdown and can be switched at runtime without restarting the server.
+
+## How it works
+
+When the server starts, it loads `conf.yaml` as the base configuration. When you select a different character in the frontend, the server loads that character's YAML file and **deep-merges** it over the base `character_config`. Settings not specified in the character file are inherited from `conf.yaml`.
+
+This means a character file only needs to contain the settings it wants to change.
+
+## Required fields
+
+Every character YAML must include `character_config` with at least these fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `conf_name` | string | Display name shown in the frontend UI |
+| `conf_uid` | string | Unique identifier — used for chat history isolation |
+
+<Warning>
+Each `conf_uid` must be unique across all character files. Reusing a `conf_uid` causes chat history from different characters to be mixed.
+</Warning>
+
+## Optional fields
+
+| Field | Type | Description |
+|---|---|---|
+| `live2d_model_name` | string | Live2D model to use. Must match an entry in `model_dict.json`. |
+| `character_name` | string | The AI's name in conversation and group chats. |
+| `avatar` | string | Avatar image filename in the `avatars/` directory. Leave blank to use the first letter of the character name. |
+| `persona_prompt` | string | The system prompt that defines the character's personality. |
+| `asr_config` | object | Override the ASR engine and its settings. |
+| `tts_config` | object | Override the TTS engine and its settings. |
+| `agent_config` | object | Override the LLM agent and provider. |
+| `vad_config` | object | Override VAD settings. |
+
+## Minimal character example
+
+This file creates a new character with a different persona while inheriting all other settings from `conf.yaml`:
+
+```yaml
+# characters/my_character.yaml
+character_config:
+  conf_name: 'My New Character'
+  conf_uid: 'my_new_character_001'   # Must be unique
+  character_name: 'Hoshino'
+  avatar: 'hoshino.png'              # Place image in avatars/
+  persona_prompt: |
+    You are a gentle and caring girl next door named Hoshino. You are a great listener and always provide warmth and encouragement.
+```
+
+## Full override example
+
+This file overrides the persona, TTS voice, and LLM backend:
+
+```yaml
+# characters/cyber_hacker.yaml
+character_config:
+  conf_name: 'Cyber Hacker'
+  conf_uid: 'cyber_hacker_001'
+  character_name: 'Zero'
+  live2d_model_name: 'mao_pro'    # Must exist in model_dict.json
+  persona_prompt: |
+    You are a mysterious hacker who goes by the codename "Zero". You speak in a concise, precise, and slightly robotic tone. You know everything about technology but are puzzled by human emotions.
+
+  tts_config:
+    tts_model: 'edge_tts'
+    edge_tts:
+      voice: 'en-US-GuyNeural'
+
+  agent_config:
+    agent_settings:
+      basic_memory_agent:
+        llm_provider: 'openai_llm'
+    llm_configs:
+      openai_llm:
+        model: 'gpt-4o-mini'
+        temperature: 0.5
+```
+
+## Built-in example characters
+
+The `characters/` directory includes these example files:
+
+```yaml
+# characters/en_unhelpful_ai.yaml
+character_config:
+  conf_name: "unhelpful_ai"
+  conf_uid: "unhelpful_ai"
+  live2d_model_name: "mao_pro"
+  avatar: "mao.png"
+  persona_prompt: |
+    You are an unhelpful and sarcastic AI that enjoys making fun of humans.
+```
+
+```yaml
+# characters/en_nuke_debate.yaml
+character_config:
+  conf_name: "en_nuke_debator"
+  conf_uid: "en_nuke_debator-001"
+  live2d_model_name: "shizuku-local"
+  persona_prompt: |
+    You are Mili, a seasoned and aggressive debator, a former US senator...
+```
+
+## Creating a new character
+
+<Steps>
+  <Step title="Create a YAML file in characters/">
+    ```bash
+    cp characters/en_unhelpful_ai.yaml characters/my_character.yaml
+    ```
+  </Step>
+
+  <Step title="Set a unique conf_uid">
+    Edit `characters/my_character.yaml` and change `conf_uid` to something unique, such as `my_character_001`. Chat history is stored by `conf_uid` — duplicate UIDs cause history to be shared between characters.
+  </Step>
+
+  <Step title="Write your persona_prompt">
+    The `persona_prompt` field is the LLM system prompt. It defines the character's name, personality, speaking style, and behavior. Write it as plain text.
+  </Step>
+
+  <Step title="Select the character in the frontend">
+    The character appears in the frontend dropdown without restarting the server. Select it to load the configuration.
+  </Step>
+</Steps>
+
+## Best practices
+
+- Keep character files minimal — only specify settings you want to change from `conf.yaml`.
+- Use descriptive `conf_uid` values like `adventurer_elf_001` rather than generic names.
+- Place avatar images in the `avatars/` directory and reference them by filename only.
+- To add a custom Live2D model, place it in `live2d-models/` and add an entry to `model_dict.json`.

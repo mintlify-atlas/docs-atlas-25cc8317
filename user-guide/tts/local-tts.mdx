@@ -1,0 +1,275 @@
+---
+title: 'Local TTS'
+description: 'Offline TTS engines — sherpa_onnx, Piper, MeloTTS, Bark, Coqui, CosyVoice, GPT-SoVITS, Spark-TTS, and more.'
+---
+
+Local TTS engines run entirely on your machine with no internet connection. Some require an external API server you host yourself; others run in-process.
+
+## sherpa_onnx_tts
+
+Fully offline VITS-based TTS using ONNX models. Supports many languages depending on the downloaded model.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'sherpa_onnx_tts'
+
+    sherpa_onnx_tts:
+      vits_model: '/path/to/tts-models/vits-melo-tts-zh_en/model.onnx'
+      vits_lexicon: '/path/to/tts-models/vits-melo-tts-zh_en/lexicon.txt'
+      vits_tokens: '/path/to/tts-models/vits-melo-tts-zh_en/tokens.txt'
+      vits_data_dir: ''
+      vits_dict_dir: '/path/to/tts-models/vits-melo-tts-zh_en/dict'
+      tts_rule_fsts: '/path/to/tts-models/vits-melo-tts-zh_en/number.fst,/path/to/tts-models/vits-melo-tts-zh_en/phone.fst'
+      max_num_sentences: 2
+      sid: 1
+      provider: 'cpu'      # 'cpu', 'cuda', or 'coreml' (Apple)
+      num_threads: 1
+      speed: 1.0
+      debug: false
+```
+
+<ParamField path="vits_model" type="string" required>
+  Path to the VITS ONNX model file.
+</ParamField>
+
+<ParamField path="vits_tokens" type="string" required>
+  Path to the `tokens.txt` file.
+</ParamField>
+
+<ParamField path="vits_lexicon" type="string">
+  Path to the lexicon file. Optional; required by some models.
+</ParamField>
+
+<ParamField path="vits_data_dir" type="string">
+  Path to espeak-ng data directory. Required for Piper-based ONNX models.
+</ParamField>
+
+<ParamField path="vits_dict_dir" type="string">
+  Path to the Jieba dictionary. Required for Chinese models.
+</ParamField>
+
+<ParamField path="tts_rule_fsts" type="string">
+  Comma-separated paths to rule FST files for text normalization. Optional.
+</ParamField>
+
+<ParamField path="sid" type="integer" default="1">
+  Speaker ID for multi-speaker models. Use `0` for single-speaker models.
+</ParamField>
+
+<ParamField path="provider" type="string" default="cpu">
+  Inference provider: `cpu`, `cuda` (NVIDIA), or `coreml` (Apple Silicon).
+</ParamField>
+
+<ParamField path="speed" type="number" default="1.0">
+  Speech speed multiplier. Values below `1.0` slow down speech; values above speed it up.
+</ParamField>
+
+### Downloading sherpa_onnx_tts models
+
+All available TTS models are listed on the GitHub releases page:
+
+`https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models`
+
+Download the archive for your desired model and update the path fields accordingly.
+
+## piper_tts
+
+Piper is a fast, lightweight offline TTS engine with high-quality models for many languages.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'piper_tts'
+
+    piper_tts:
+      model_path: 'models/piper/zh_CN-huayan-medium.onnx'
+      speaker_id: 0
+      length_scale: 1.0    # Speech speed (lower = faster)
+      noise_scale: 0.667   # Audio variation (0.0–1.0)
+      noise_w: 0.8         # Style variation (0.0–1.0)
+      volume: 1.0
+      normalize_audio: true
+      use_cuda: false
+```
+
+<ParamField path="model_path" type="string" required>
+  Path to a Piper `.onnx` model file. Download models from `https://huggingface.co/rhasspy/piper-voices`.
+</ParamField>
+
+<ParamField path="speaker_id" type="integer" default="0">
+  Speaker ID for multi-speaker models. Use `0` for single-speaker models.
+</ParamField>
+
+<ParamField path="length_scale" type="number" default="1.0">
+  Controls speech duration. `0.5` is twice as fast; `2.0` is twice as slow.
+</ParamField>
+
+<ParamField path="use_cuda" type="boolean" default="false">
+  Enable GPU acceleration. Requires `onnxruntime-gpu`.
+</ParamField>
+
+## melo_tts
+
+MeloTTS supports English and Chinese. It runs locally and is reasonably fast on CPU.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'melo_tts'
+
+    melo_tts:
+      speaker: 'EN-Default'   # or 'ZH' for Chinese
+      language: 'EN'          # or 'ZH'
+      device: 'auto'          # 'cpu', 'cuda', 'cuda:0', or 'mps'
+      speed: 1.0
+```
+
+## bark_tts
+
+Suno Bark is an expressive generative TTS model. It supports non-verbal sounds and multiple speaker presets.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'bark_tts'
+
+    bark_tts:
+      voice: 'v2/en_speaker_1'
+```
+
+<Note>
+Bark is slow on CPU. It works best with a CUDA GPU. First run downloads large model files.
+</Note>
+
+## pyttsx3_tts
+
+pyttsx3 uses your operating system's built-in TTS engine. No configuration is required.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'pyttsx3_tts'
+```
+
+Voice quality depends on the voices installed in your OS. This is the lowest-latency offline option.
+
+## coqui_tts
+
+Coqui TTS supports many models including XTTS v2, which enables voice cloning from a reference audio clip.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'coqui_tts'
+
+    coqui_tts:
+      model_name: 'tts_models/multilingual/multi-dataset/xtts_v2'
+      speaker_wav: 'path/to/reference.wav'   # Required for voice cloning models
+      language: 'en'
+      device: ''
+```
+
+Run `tts --list_models` to see all available Coqui models.
+
+## cosyvoice_tts
+
+CosyVoice connects to a running CosyVoice Gradio WebUI server. See the CosyVoice project for deployment instructions.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'cosyvoice_tts'
+
+    cosyvoice_tts:
+      client_url: 'http://127.0.0.1:50000/'
+      mode_checkbox_group: '预训练音色'
+      sft_dropdown: '中文女'
+      prompt_text: ''
+      prompt_wav_upload_url: 'https://github.com/gradio-app/gradio/raw/main/test/test_files/audio_sample.wav'
+      prompt_wav_record_url: 'https://github.com/gradio-app/gradio/raw/main/test/test_files/audio_sample.wav'
+      instruct_text: ''
+      seed: 0
+      api_name: '/generate_audio'
+```
+
+## cosyvoice2_tts
+
+CosyVoice 2 also connects to a Gradio WebUI server and supports 3-second voice cloning.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'cosyvoice2_tts'
+
+    cosyvoice2_tts:
+      client_url: 'http://127.0.0.1:50000/'
+      mode_checkbox_group: '3s极速复刻'
+      sft_dropdown: ''
+      prompt_text: ''
+      prompt_wav_upload_url: 'https://github.com/gradio-app/gradio/raw/main/test/test_files/audio_sample.wav'
+      prompt_wav_record_url: 'https://github.com/gradio-app/gradio/raw/main/test/test_files/audio_sample.wav'
+      instruct_text: ''
+      stream: false
+      seed: 0
+      speed: 1.0
+      api_name: '/generate_audio'
+```
+
+## gpt_sovits_tts
+
+GPT-SoVITS enables high-quality voice cloning. It runs as a local API server.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'gpt_sovits_tts'
+
+    gpt_sovits_tts:
+      api_url: 'http://127.0.0.1:9880/tts'
+      text_lang: 'zh'
+      ref_audio_path: ''
+      prompt_lang: 'zh'
+      prompt_text: ''
+      text_split_method: 'cut5'
+      batch_size: '1'
+      media_type: 'wav'
+      streaming_mode: 'false'
+```
+
+Put the reference audio file in the GPT-SoVITS root directory, or set `ref_audio_path` to the full path.
+
+## spark_tts
+
+Spark-TTS runs as a Gradio server and supports voice cloning and voice creation modes.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'spark_tts'
+
+    spark_tts:
+      api_url: 'http://127.0.0.1:6006/'
+      api_name: 'voice_clone'                  # or 'voice_creation'
+      prompt_wav_upload: 'https://example.com/reference.mp3'   # Required for voice_clone
+      gender: 'female'                          # Used with voice_creation
+      pitch: 3                                  # 1–5, used with voice_creation
+      speed: 3                                  # 1–5, used with voice_creation
+```
+
+## openai_tts (self-hosted)
+
+`openai_tts` connects to any OpenAI-compatible TTS endpoint. This is commonly used with self-hosted servers like Kokoro.
+
+```yaml
+character_config:
+  tts_config:
+    tts_model: 'openai_tts'
+
+    openai_tts:
+      model: 'kokoro'
+      voice: 'af_sky+af_bella'
+      api_key: 'not-needed'
+      base_url: 'http://localhost:8880/v1'
+      file_extension: 'mp3'
+```
